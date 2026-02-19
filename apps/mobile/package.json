@@ -1,0 +1,17 @@
+{
+  "name": "@ledger/mobile",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "build": "npm run build -w @ledger/web && cap sync"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.1.2",
+    "@capacitor/core": "^6.1.2",
+    "@capacitor/ios": "^6.1.2",
+    "@capacitor-community/sqlite": "^6.0.1"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.1.2"
+  }
+}
