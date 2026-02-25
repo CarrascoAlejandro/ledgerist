@@ -30,7 +30,9 @@
   "jest": {
     "projects": [
       "<rootDir>/packages/shared",
-      "<rootDir>/packages/database"
+      "<rootDir>/packages/database",
+      "<rootDir>/packages/stores",
+      "<rootDir>/apps/web"
     ]
   }
 }
