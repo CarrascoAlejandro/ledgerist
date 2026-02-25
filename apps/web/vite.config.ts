@@ -16,6 +16,7 @@ export default defineConfig({
     alias: {
       '@ledger/shared': path.resolve(__dirname, '../../packages/shared/src/index.ts'),
       '@ledger/database': path.resolve(__dirname, '../../packages/database/src/index.ts'),
+      '@ledger/stores': path.resolve(__dirname, '../../packages/stores/src/index.ts'),
     },
   },
   optimizeDeps: { exclude: ['sql.js'] },

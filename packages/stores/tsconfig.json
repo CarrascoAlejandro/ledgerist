@@ -1,6 +1,7 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    "noEmit": false,
     "paths": {
       "@ledger/shared": ["../shared/src/index.ts"],
       "@ledger/database": ["../database/src/index.ts"]
