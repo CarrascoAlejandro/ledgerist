@@ -1,7 +1,8 @@
 /**
- * sql.js mock for test environments.
+ * sql.js mock for stores test environment.
  * Loads the real sql.js using jest.requireActual and provides wasmBinary
  * directly to bypass jsdom's browser-mode detection in Emscripten.
+ * Tests that need real SQL must use @jest-environment node to get sql-wasm.js.
  */
 import fs from 'fs';
 import path from 'path';
