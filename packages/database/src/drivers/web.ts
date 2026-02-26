@@ -81,24 +81,28 @@ export class WebDBConnection implements IDBConnection {
   }
 
   async query<T>(sql: string, params: unknown[] = []): Promise<T[]> {
-    const results = this.db.exec(sql, params);
-    if (!results || results.length === 0) return [];
-
-    const { columns, values } = results[0];
-    return values.map((row: unknown[]) => {
-      const obj: Record<string, unknown> = {};
-      columns.forEach((col: string, i: number) => {
-        obj[col] = row[i];
-      });
-      return obj as T;
-    });
+    const stmt = this.db.prepare(sql);
+    stmt.bind(params);
+    const rows: T[] = [];
+    while (stmt.step()) {
+      rows.push(stmt.getAsObject() as T);
+    }
+    stmt.free();
+    return rows;
   }
 
   async run(
     sql: string,
     params: unknown[] = [],
   ): Promise<{ lastID?: number; changes?: number }> {
-    this.db.run(sql, params);
+    if (Array.isArray(params) && params.some((p) => p === null || p === undefined)) {
+      // eslint-disable-next-line no-console
+      console.warn('[db] run with nullish params', {
+        sql,
+        params,
+      });
+    }
+    this.execute(sql, params);
     const lastIDResult = this.db.exec('SELECT last_insert_rowid() as id');
     const changesResult = this.db.exec('SELECT changes() as n');
 
@@ -115,14 +119,14 @@ export class WebDBConnection implements IDBConnection {
   }
 
   async transaction(ops: Array<{ sql: string; params?: unknown[] }>): Promise<void> {
-    this.db.run('BEGIN');
+    this.execute('BEGIN');
     try {
       for (const op of ops) {
-        this.db.run(op.sql, op.params ?? []);
+        this.execute(op.sql, op.params ?? []);
       }
-      this.db.run('COMMIT');
+      this.execute('COMMIT');
     } catch (err) {
-      this.db.run('ROLLBACK');
+      this.execute('ROLLBACK');
       throw err;
     }
 
@@ -149,6 +153,15 @@ export class WebDBConnection implements IDBConnection {
     const data = this.db.export() as Uint8Array;
     await saveToIndexedDB(this.dbName, data);
   }
+
+  private execute(sql: string, params: unknown[] = []): void {
+    const stmt = this.db.prepare(sql);
+    stmt.bind(params);
+    while (stmt.step()) {
+      // Intentionally drain results for statements that return rows.
+    }
+    stmt.free();
+  }
 }
 
 export async function createWebConnection(
@@ -159,9 +172,49 @@ export async function createWebConnection(
 
   // Dynamically import sql.js to avoid bundler issues
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const initSqlJs = (await import('sql.js')).default as any;
+  const sqlJsModule = (await import('sql.js')) as any;
+  let initSqlJsFrom =
+    (typeof sqlJsModule?.default?.default === 'function' && 'default.default') ||
+    (typeof sqlJsModule?.default === 'function' && 'default') ||
+    (typeof sqlJsModule?.initSqlJs === 'function' && 'initSqlJs') ||
+    (typeof sqlJsModule === 'function' && 'module') ||
+    'unknown';
+  let initSqlJs =
+    sqlJsModule?.default?.default ??
+    sqlJsModule?.default ??
+    sqlJsModule?.initSqlJs ??
+    sqlJsModule;
+  if (typeof initSqlJs !== 'function') {
+    // eslint-disable-next-line no-console
+    console.info('[db] sql.js init export: unknown', {
+      keys: Object.keys(sqlJsModule ?? {}),
+      defaultType: typeof sqlJsModule?.default,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sqlJsWasmModule = (await import('sql.js/dist/sql-wasm.js')) as any;
+    initSqlJsFrom =
+      (typeof sqlJsWasmModule?.default?.default === 'function' &&
+        'dist/sql-wasm.default.default') ||
+      (typeof sqlJsWasmModule?.default === 'function' && 'dist/sql-wasm.default') ||
+      (typeof sqlJsWasmModule?.initSqlJs === 'function' && 'dist/sql-wasm.initSqlJs') ||
+      (typeof sqlJsWasmModule === 'function' && 'dist/sql-wasm.module') ||
+      'unknown';
+    initSqlJs =
+      sqlJsWasmModule?.default?.default ??
+      sqlJsWasmModule?.default ??
+      sqlJsWasmModule?.initSqlJs ??
+      sqlJsWasmModule;
+  }
+  // eslint-disable-next-line no-console
+  console.info('[db] sql.js init export:', initSqlJsFrom);
+  if (typeof initSqlJs !== 'function') {
+    throw new Error('sql.js initSqlJs export not found');
+  }
+  const wasmUrl = new URL('sql.js/dist/sql-wasm.wasm', import.meta.url).toString();
+  // eslint-disable-next-line no-console
+  console.info('[db] sql.js wasm url:', wasmUrl);
   const SQL = await initSqlJs({
-    locateFile: (f: string) => `/assets/${f}`,
+    locateFile: (f: string) => (f.endsWith('.wasm') ? wasmUrl : `/assets/${f}`),
   });
 
   let db;

@@ -31,6 +31,8 @@ export function createQueries(db: IDBConnection) {
     },
 
     async insertBook(book_id: string, name: string): Promise<void> {
+      // eslint-disable-next-line no-console
+      console.info('[db] insertBook', { book_id, name, nameType: typeof name });
       await db.run(
         `INSERT INTO books (book_id, name, is_closed, is_balanced, is_auto_open, status)
          VALUES (?, ?, 0, 0, 0, 1)`,
