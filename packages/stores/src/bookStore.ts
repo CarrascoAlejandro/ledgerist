@@ -47,6 +47,11 @@ export const useBookStore = create<BookState & BookActions>((set, get) => ({
   async createBook({ name }) {
     const validation = validateBookName(name);
     if (!validation.valid) {
+      // eslint-disable-next-line no-console
+      console.warn('[store] createBook validation failed', {
+        input: name,
+        error: validation.error,
+      });
       return { success: false, error: validation.error!, code: 'VALIDATION_ERROR' };
     }
     const trimmedName = validation.value!;
@@ -55,20 +60,28 @@ export const useBookStore = create<BookState & BookActions>((set, get) => ({
       (b) => b.name.toLowerCase() === trimmedName.toLowerCase(),
     );
     if (existing) {
+      // eslint-disable-next-line no-console
+      console.warn('[store] createBook conflict', { name: trimmedName });
       return { success: false, error: 'A book with this name already exists', code: 'CONFLICT' };
     }
 
     try {
+      // eslint-disable-next-line no-console
+      console.info('[store] createBook inserting', { name: trimmedName });
       const q = createQueries(getDB());
       const book_id = crypto.randomUUID();
       await q.insertBook(book_id, trimmedName);
       await get().fetchBooks();
       const created = get().books.find((b) => b.book_id === book_id) ?? null;
       if (!created) {
+        // eslint-disable-next-line no-console
+        console.warn('[store] createBook insert missing after fetch', { book_id });
         return { success: false, error: 'Book not found after insert', code: 'DATABASE_ERROR' };
       }
       return { success: true, data: created };
     } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error('[store] createBook failed', e);
       return { success: false, error: String(e), code: 'DATABASE_ERROR' };
     }
   },

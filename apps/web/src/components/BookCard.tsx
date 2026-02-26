@@ -21,11 +21,18 @@ export default function BookCard({ book, onClick }: Props) {
             </p>
           </div>
         </div>
-        {book.is_closed === 1 && (
-          <span className="rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-300">
-            Closed
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          {book.is_balanced === 1 && (
+            <span className="rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-700 dark:bg-green-900 dark:text-green-300">
+              Balanced
+            </span>
+          )}
+          {book.is_closed === 1 && (
+            <span className="rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+              Closed
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );

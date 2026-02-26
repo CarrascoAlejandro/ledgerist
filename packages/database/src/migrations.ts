@@ -31,7 +31,7 @@ export async function runMigrations(conn: IDBConnection): Promise<void> {
 
   // Record migration
   await conn.run(
-    `INSERT INTO _migrations (id) VALUES (?)`,
+    `INSERT OR IGNORE INTO _migrations (id) VALUES (?)`,
     ['001_init'],
   );
 }

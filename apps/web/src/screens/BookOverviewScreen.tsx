@@ -1,20 +1,31 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useBookStore, useLedgerStore } from '@ledger/stores';
-import LedgerCard from '../components/LedgerCard.js';
+import { useBookStore, useLedgerStore, useEntryStore } from '@ledger/stores';
+import LedgerSection from '../components/LedgerSection.js';
+import ParserBar from '../components/ParserBar.js';
 
 export default function BookOverviewScreen() {
   const navigate = useNavigate();
   const { bookId } = useParams<{ bookId: string }>();
   const { currentBook, loading: bookLoading } = useBookStore();
-  const { ledgers, loading: ledgerLoading, error: ledgerError, createLedger } = useLedgerStore();
+  const {
+    ledgers,
+    collapsed,
+    loading: ledgerLoading,
+    error: ledgerError,
+    createLedger,
+    toggleLedgerCollapse,
+  } = useLedgerStore();
+  const { getEntriesForLedger } = useEntryStore();
   const [newLedgerName, setNewLedgerName] = useState('');
   const [createError, setCreateError] = useState<string | null>(null);
+  const [parserOpen, setParserOpen] = useState(false);
 
   useEffect(() => {
     if (bookId) {
       useBookStore.getState().openBook(bookId);
       useLedgerStore.getState().fetchLedgers(bookId);
+      useEntryStore.getState().fetchEntriesForBook(bookId);
     }
   }, [bookId]);
 
@@ -66,7 +77,13 @@ export default function BookOverviewScreen() {
         {!loading && ledgers.length > 0 && (
           <div className="mb-6 flex flex-col gap-3">
             {ledgers.map((ledger) => (
-              <LedgerCard key={ledger.ledger_id} ledger={ledger} />
+              <LedgerSection
+                key={ledger.ledger_id}
+                ledger={ledger}
+                entries={getEntriesForLedger(ledger.ledger_id)}
+                isCollapsed={collapsed[ledger.ledger_id] ?? false}
+                onToggleCollapse={() => toggleLedgerCollapse(ledger.ledger_id)}
+              />
             ))}
           </div>
         )}
@@ -99,6 +116,22 @@ export default function BookOverviewScreen() {
           </div>
         )}
       </main>
+
+      {/* FAB: only visible when book is open */}
+      {currentBook?.is_closed !== 1 && (
+        <button
+          onClick={() => setParserOpen(true)}
+          className="fixed bottom-6 right-6 flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-2xl text-white shadow-lg hover:bg-blue-700"
+          aria-label="Add entry"
+        >
+          ✏️
+        </button>
+      )}
+
+      {/* Parser overlay */}
+      {parserOpen && bookId && (
+        <ParserBar bookId={bookId} onClose={() => setParserOpen(false)} />
+      )}
     </div>
   );
 }

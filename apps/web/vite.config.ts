@@ -19,7 +19,7 @@ export default defineConfig({
       '@ledger/stores': path.resolve(__dirname, '../../packages/stores/src/index.ts'),
     },
   },
-  optimizeDeps: { exclude: ['sql.js'] },
+  optimizeDeps: { include: ['sql.js', 'sql.js/dist/sql-wasm.js'] },
   server: {
     headers: {
       'Cross-Origin-Opener-Policy': 'same-origin',

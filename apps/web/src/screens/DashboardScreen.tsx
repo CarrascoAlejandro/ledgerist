@@ -18,7 +18,15 @@ export default function DashboardScreen() {
   }, []);
 
   async function handleCreate() {
+    // eslint-disable-next-line no-console
+    console.info('[ui] create book clicked', {
+      rawName: newBookName,
+      trimmedName: newBookName.trim(),
+      length: newBookName.length,
+    });
     const result = await createBook({ name: newBookName });
+    // eslint-disable-next-line no-console
+    console.info('[ui] create book result', result);
     if (result.success) {
       setNewBookName('');
       setCreateError(null);

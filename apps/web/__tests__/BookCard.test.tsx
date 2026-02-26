@@ -45,6 +45,16 @@ describe('BookCard', () => {
     expect(screen.queryByText('Closed')).not.toBeInTheDocument();
   });
 
+  it('shows Balanced badge when is_balanced is 1', () => {
+    render(<BookCard book={makeBook({ is_balanced: 1 })} onClick={() => {}} />);
+    expect(screen.getByText('Balanced')).toBeInTheDocument();
+  });
+
+  it('does not show Balanced badge when is_balanced is 0', () => {
+    render(<BookCard book={makeBook({ is_balanced: 0 })} onClick={() => {}} />);
+    expect(screen.queryByText('Balanced')).not.toBeInTheDocument();
+  });
+
   it('calls onClick when card is clicked', async () => {
     const user = userEvent.setup();
     const handleClick = jest.fn();
