@@ -2,17 +2,47 @@
   "name": "@ledger/desktop",
   "version": "0.0.1",
   "private": true,
+  "main": "dist/main.js",
   "scripts": {
-    "build": "npm run build -w @ledger/web && cap sync"
+    "build:web": "npm run build -w @ledger/web",
+    "build:ts": "esbuild src/main.ts --bundle --platform=node --external:electron --external:better-sqlite3 --external:sql.js --outdir=dist --format=cjs --sourcemap && esbuild src/preload.ts --bundle --platform=node --external:electron --outdir=dist --format=cjs --sourcemap",
+    "build": "npm run build:web && npm run build:ts && electron-builder",
+    "start": "electron dist/main.js",
+    "dev": "npm run build:web && npm run build:ts && electron dist/main.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@capacitor/core": "^6.1.2",
     "better-sqlite3": "^11.1.2",
     "electron": "^31.3.1"
   },
   "devDependencies": {
-    "@capacitor/cli": "^6.1.2",
     "@types/better-sqlite3": "^7.6.11",
+    "esbuild": "^0.23.0",
     "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.ledger.desktop",
+    "productName": "Ledger",
+    "files": [
+      "dist/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "../web/dist",
+        "to": "web-dist"
+      }
+    ],
+    "directories": {
+      "output": "dist-electron"
+    },
+    "mac": {
+      "target": "dmg"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "linux": {
+      "target": "deb"
+    }
   }
 }

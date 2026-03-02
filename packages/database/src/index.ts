@@ -1,6 +1,7 @@
 export type { IDBConnection, DBConnectionOptions, DBConnectionFactory } from './connection.js';
 export { runMigrations } from './migrations.js';
 export { WebDBConnection } from './drivers/web.js';
+export { ElectronRendererConnection } from './drivers/electron-renderer.js';
 export { createQueries } from './queries.js';
 export type { Queries } from './queries.js';
 
@@ -12,5 +13,15 @@ export async function createWebConnection(
   opts: DBConnectionOptions = {},
 ): Promise<IDBConnection> {
   const { createWebConnection: factory } = await import('./drivers/create-web.js');
+  return factory(name, opts);
+}
+
+// Lazy-load createDesktopConnection so that better-sqlite3 (native addon) is never
+// loaded in web or test environments.
+export async function createDesktopConnection(
+  name: string,
+  opts: DBConnectionOptions = {},
+): Promise<IDBConnection> {
+  const { createDesktopConnection: factory } = await import('./drivers/create-desktop.js');
   return factory(name, opts);
 }

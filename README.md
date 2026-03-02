@@ -40,8 +40,10 @@ required.
 |-------|------------|
 | UI | React 19, Tailwind CSS v3, React Router v6 |
 | State | Zustand stores (book, ledger, entry, settings, navigation) |
-| Database | sql.js (SQLite compiled to WebAssembly), runs entirely in the browser |
-| Build | Vite 5 |
+| Database (web) | sql.js (SQLite compiled to WebAssembly), runs entirely in the browser |
+| Database (desktop) | better-sqlite3 (native SQLite via Electron IPC) |
+| Build | Vite 5 (web), esbuild (desktop) |
+| Packaging | electron-builder (.dmg / .exe / .deb) |
 | Tests | Jest 29, ts-jest, @testing-library/react |
 | Language | TypeScript 5 (strict) |
 
@@ -52,16 +54,21 @@ required.
 ```
 ledger-project/
 ├── apps/
-│   └── web/                  # React app (Vite)
+│   ├── web/                  # React app (Vite)
+│   │   ├── src/
+│   │   │   ├── components/   # BookCard, LedgerSection, ParserBar, …
+│   │   │   ├── screens/      # DashboardScreen, BookOverviewScreen, AppSettingsScreen
+│   │   │   ├── App.tsx
+│   │   │   └── main.tsx      # Detects Electron and switches DB driver automatically
+│   │   └── __tests__/        # Component tests
+│   └── desktop/              # Electron wrapper
 │       ├── src/
-│       │   ├── components/   # BookCard, LedgerSection, ParserBar, …
-│       │   ├── screens/      # DashboardScreen, BookOverviewScreen, AppSettingsScreen
-│       │   ├── App.tsx
-│       │   └── main.tsx
-│       └── __tests__/        # Component tests
+│       │   ├── main.ts       # Electron main process (DB init, IPC handlers, BrowserWindow)
+│       │   └── preload.ts    # contextBridge — exposes window.electronAPI.db to renderer
+│       └── dist/             # esbuild output (main.js, preload.js)
 ├── packages/
 │   ├── shared/               # Domain types (Book, Ledger, Entry, AppSettings) + utils
-│   ├── database/             # IDBConnection, WebDBConnection, runMigrations, createQueries
+│   ├── database/             # IDBConnection interface + drivers (web, desktop, renderer)
 │   └── stores/               # Zustand stores
 ├── package.json              # npm workspaces root
 └── tsconfig.base.json
@@ -100,6 +107,63 @@ Output goes to `apps/web/dist/`.
 
 ---
 
+## Desktop App (Electron)
+
+The same React app runs inside Electron with a native SQLite database
+(`better-sqlite3`) instead of the WebAssembly-based sql.js. Data is stored
+in the OS user-data directory:
+
+| Platform | Path |
+|----------|------|
+| Linux | `~/.config/Ledger/ledger.db` |
+| macOS | `~/Library/Application Support/Ledger/ledger.db` |
+| Windows | `%APPDATA%\Ledger\ledger.db` |
+
+### Prerequisites
+
+In addition to Node.js ≥ 18 and npm ≥ 9, you need the native build toolchain
+for `better-sqlite3`:
+
+- **Linux/macOS**: `gcc`/`clang` + Python 3 (usually already present)
+- **Windows**: Visual Studio Build Tools with "Desktop development with C++"
+
+### Run in development
+
+Build the web app and launch Electron in one step:
+
+```bash
+npm run desktop
+```
+
+> The web bundle is written to `apps/web/dist/` and Electron loads it from
+> there. Re-run the command after changing source files to pick up updates.
+
+### Build an installer
+
+```bash
+npm run build:desktop
+```
+
+This builds the web app, compiles the Electron main/preload scripts, and
+runs `electron-builder`. Installers are written to `apps/desktop/dist-electron/`:
+
+| Platform | Artifact |
+|----------|----------|
+| Linux | `.deb` package |
+| macOS | `.dmg` image |
+| Windows | `.exe` NSIS installer |
+
+Run `build:desktop` on each target platform — cross-compilation is not
+supported for native modules.
+
+### Type-check the desktop app
+
+```bash
+npx tsc -p apps/desktop/tsconfig.json --noEmit
+```
+
+---
+
 ## Testing
 
 Run all tests across every package:
@@ -120,7 +184,7 @@ Run in watch mode:
 npm run test:watch
 ```
 
-There are currently **131+ tests** across 8 suites:
+There are currently **170 tests** across 11 suites:
 
 | Suite | Package |
 |-------|---------|
@@ -165,5 +229,9 @@ transfer <amount> #<source> to #<target>
 
 ## Data Storage
 
-The database lives entirely in memory via sql.js and is persisted to the browser's
-`IndexedDB` between sessions. No data is sent to any server.
+| Mode | Storage |
+|------|---------|
+| Browser | sql.js in-memory SQLite, persisted to `IndexedDB` between sessions |
+| Desktop | Native SQLite file via `better-sqlite3`, stored in the OS user-data directory |
+
+No data is ever sent to any server.
