@@ -5,7 +5,10 @@ interface Props {
   ledger: Ledger;
   entries: Entry[];
   isCollapsed: boolean;
+  isBookClosed?: boolean;
   onToggleCollapse: () => void;
+  onSettingsClick?: () => void;
+  onEditEntry?: (entry: Entry) => void;
 }
 
 function formatBalance(balance: number): string {
@@ -13,7 +16,15 @@ function formatBalance(balance: number): string {
   return `${sign}${balance.toFixed(2)}`;
 }
 
-export default function LedgerSection({ ledger, entries, isCollapsed, onToggleCollapse }: Props) {
+export default function LedgerSection({
+  ledger,
+  entries,
+  isCollapsed,
+  isBookClosed = false,
+  onToggleCollapse,
+  onSettingsClick,
+  onEditEntry,
+}: Props) {
   const totalCredits = entries
     .filter((e) => e.cat_direction === 'add')
     .reduce((sum, e) => sum + e.amount, 0);
@@ -23,24 +34,38 @@ export default function LedgerSection({ ledger, entries, isCollapsed, onToggleCo
   return (
     <div className="rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
       {/* Header row */}
-      <button
-        onClick={onToggleCollapse}
-        className="flex w-full items-center gap-3 px-4 py-3 text-left"
-        aria-expanded={!isCollapsed}
-      >
-        <span className="text-xl">{ledger.icon}</span>
-        <span className="flex-1 font-semibold text-gray-900 dark:text-gray-100">
-          {ledger.ledger_name}
-        </span>
-        <span
-          className={`tabular-nums font-medium ${isPositive ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
+      <div className="flex items-center">
+        <button
+          onClick={onToggleCollapse}
+          className="flex flex-1 items-center gap-3 px-4 py-3 text-left"
+          aria-expanded={!isCollapsed}
         >
-          {formatBalance(ledger.balance)}
-        </span>
-        <span className="ml-1 text-gray-400 dark:text-gray-500">
-          {isCollapsed ? '›' : '▾'}
-        </span>
-      </button>
+          <span className="text-xl">{ledger.icon}</span>
+          <span className="flex-1 font-semibold text-gray-900 dark:text-gray-100">
+            {ledger.ledger_name}
+          </span>
+          <span
+            className={`tabular-nums font-medium ${isPositive ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
+          >
+            {formatBalance(ledger.balance)}
+          </span>
+          <span className="ml-1 text-gray-400 dark:text-gray-500">
+            {isCollapsed ? '›' : '▾'}
+          </span>
+        </button>
+        {!isBookClosed && onSettingsClick && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onSettingsClick();
+            }}
+            className="px-3 py-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+            aria-label="Ledger settings"
+          >
+            ⚙️
+          </button>
+        )}
+      </div>
 
       {/* Expanded content */}
       {!isCollapsed && (
@@ -52,7 +77,11 @@ export default function LedgerSection({ ledger, entries, isCollapsed, onToggleCo
               </p>
             ) : (
               entries.map((entry) => (
-                <EntryListItem key={entry.entry_id} entry={entry} />
+                <EntryListItem
+                  key={entry.entry_id}
+                  entry={entry}
+                  onClick={onEditEntry ? () => onEditEntry(entry) : undefined}
+                />
               ))
             )}
           </div>

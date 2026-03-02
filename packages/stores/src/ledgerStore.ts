@@ -31,6 +31,11 @@ interface LedgerActions {
   }): Promise<ActionResult<Ledger>>;
   toggleLedgerCollapse(ledger_id: string): void;
   renameLedger(input: { ledger_id: string; ledger_name: string }): Promise<ActionResult<Ledger>>;
+  setLedgerAlias(input: {
+    ledger_id: string;
+    alias: string | null;
+    book_id: string;
+  }): Promise<ActionResult<Ledger>>;
   deleteLedger(input: { ledger_id: string; book_id: string }): Promise<ActionResult>;
 
   // Getters
@@ -129,6 +134,43 @@ export const useLedgerStore = create<LedgerState & LedgerActions>((set, get) => 
       const updated = get().ledgers.find((l) => l.ledger_id === ledger_id) ?? null;
       if (!updated) {
         return { success: false, error: 'Ledger not found after rename', code: 'NOT_FOUND' };
+      }
+      return { success: true, data: updated };
+    } catch (e) {
+      return { success: false, error: String(e), code: 'DATABASE_ERROR' };
+    }
+  },
+
+  async setLedgerAlias({ ledger_id, alias, book_id }) {
+    const ledger = get().ledgers.find((l) => l.ledger_id === ledger_id);
+    if (!ledger) {
+      return { success: false, error: 'Ledger not found', code: 'NOT_FOUND' };
+    }
+
+    const book = useBookStore.getState().books.find((b) => b.book_id === book_id);
+    if (book?.is_closed) {
+      return { success: false, error: 'Cannot update alias in a closed book', code: 'PERMISSION_DENIED' };
+    }
+
+    if (alias !== null && alias.trim() !== '') {
+      const normalizedAlias = alias.trim().toLowerCase();
+      if (!get().isAliasAvailable(book_id, normalizedAlias, ledger_id)) {
+        return { success: false, error: 'Alias already in use in this book', code: 'VALIDATION_ERROR' };
+      }
+    }
+
+    try {
+      const q = createQueries(getDB());
+      const resolvedAlias = alias === null || alias.trim() === '' ? null : alias.trim().toLowerCase();
+      await q.updateLedgerAlias(ledger_id, resolvedAlias);
+      set((state) => ({
+        ledgers: state.ledgers.map((l) =>
+          l.ledger_id === ledger_id ? { ...l, alias: resolvedAlias } : l,
+        ),
+      }));
+      const updated = get().ledgers.find((l) => l.ledger_id === ledger_id) ?? null;
+      if (!updated) {
+        return { success: false, error: 'Ledger not found after update', code: 'NOT_FOUND' };
       }
       return { success: true, data: updated };
     } catch (e) {

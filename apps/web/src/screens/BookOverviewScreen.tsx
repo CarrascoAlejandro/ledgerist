@@ -1,8 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useBookStore, useLedgerStore, useEntryStore } from '@ledger/stores';
+import type { Ledger, Entry } from '@ledger/shared';
 import LedgerSection from '../components/LedgerSection.js';
 import ParserBar from '../components/ParserBar.js';
+import BookSettingsModal from '../components/BookSettingsModal.js';
+import LedgerSettingsModal from '../components/LedgerSettingsModal.js';
+import EntryEditModal from '../components/EntryEditModal.js';
 
 export default function BookOverviewScreen() {
   const navigate = useNavigate();
@@ -20,6 +24,9 @@ export default function BookOverviewScreen() {
   const [newLedgerName, setNewLedgerName] = useState('');
   const [createError, setCreateError] = useState<string | null>(null);
   const [parserOpen, setParserOpen] = useState(false);
+  const [bookSettingsOpen, setBookSettingsOpen] = useState(false);
+  const [settingsLedger, setSettingsLedger] = useState<Ledger | null>(null);
+  const [editingEntry, setEditingEntry] = useState<Entry | null>(null);
 
   useEffect(() => {
     if (bookId) {
@@ -61,6 +68,15 @@ export default function BookOverviewScreen() {
             </span>
           )}
         </div>
+        {currentBook && (
+          <button
+            onClick={() => setBookSettingsOpen(true)}
+            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+            aria-label="Book settings"
+          >
+            ⚙️
+          </button>
+        )}
       </header>
 
       <main className="mx-auto max-w-lg px-4 py-6">
@@ -82,7 +98,10 @@ export default function BookOverviewScreen() {
                 ledger={ledger}
                 entries={getEntriesForLedger(ledger.ledger_id)}
                 isCollapsed={collapsed[ledger.ledger_id] ?? false}
+                isBookClosed={currentBook?.is_closed === 1}
                 onToggleCollapse={() => toggleLedgerCollapse(ledger.ledger_id)}
+                onSettingsClick={() => setSettingsLedger(ledger)}
+                onEditEntry={setEditingEntry}
               />
             ))}
           </div>
@@ -131,6 +150,28 @@ export default function BookOverviewScreen() {
       {/* Parser overlay */}
       {parserOpen && bookId && (
         <ParserBar bookId={bookId} onClose={() => setParserOpen(false)} />
+      )}
+
+      {/* Book settings modal */}
+      {bookSettingsOpen && currentBook && (
+        <BookSettingsModal book={currentBook} onClose={() => setBookSettingsOpen(false)} />
+      )}
+
+      {/* Ledger settings modal */}
+      {settingsLedger && (
+        <LedgerSettingsModal
+          ledger={settingsLedger}
+          onClose={() => setSettingsLedger(null)}
+        />
+      )}
+
+      {/* Entry edit modal */}
+      {editingEntry && bookId && (
+        <EntryEditModal
+          entry={editingEntry}
+          bookId={bookId}
+          onClose={() => setEditingEntry(null)}
+        />
       )}
     </div>
   );
