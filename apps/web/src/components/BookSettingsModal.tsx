@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { useBookStore } from '@ledger/stores';
+import { useBookStore, useEntryStore, useLedgerStore } from '@ledger/stores';
+import { roundAmount, todayISO } from '@ledger/shared';
 import type { Book } from '@ledger/shared';
 import ConfirmDialog from './ConfirmDialog.js';
 
@@ -10,8 +11,14 @@ interface Props {
 
 export default function BookSettingsModal({ book, onClose }: Props) {
   const { renameBook, closeBook, reopenBook } = useBookStore();
+  const { addEntry } = useEntryStore();
+  const { getLedgersForBook } = useLedgerStore();
+  const ledgers = getLedgersForBook(book.book_id);
+  const unbalancedLedgers = ledgers.filter((ledger) => roundAmount(ledger.balance) !== 0);
   const [name, setName] = useState(book.name);
   const [nameError, setNameError] = useState<string | null>(null);
+  const [closeError, setCloseError] = useState<string | null>(null);
+  const [showCloseConfirm, setShowCloseConfirm] = useState(false);
   const [showReopenConfirm, setShowReopenConfirm] = useState(false);
 
   async function handleRename() {
@@ -24,7 +31,48 @@ export default function BookSettingsModal({ book, onClose }: Props) {
   }
 
   async function handleClose() {
-    await closeBook(book.book_id);
+    setCloseError(null);
+    if (unbalancedLedgers.length > 0) {
+      setShowCloseConfirm(true);
+      return;
+    }
+    const result = await closeBook(book.book_id);
+    if (!result.success) {
+      setCloseError(result.error ?? 'Failed to close book');
+      return;
+    }
+    onClose();
+  }
+
+  async function handleForceClose() {
+    setCloseError(null);
+    const pendingLedgers = getLedgersForBook(book.book_id).filter(
+      (ledger) => roundAmount(ledger.balance) !== 0,
+    );
+    for (const ledger of pendingLedgers) {
+      const roundedBalance = roundAmount(ledger.balance);
+      if (roundedBalance === 0) continue;
+      const result = await addEntry({
+        book_id: ledger.book_id,
+        ledger_id: ledger.ledger_id,
+        entry_date: todayISO(),
+        detail: 'Balance adjustment',
+        amount: Math.abs(roundedBalance),
+        cat_direction: roundedBalance > 0 ? 'sub' : 'add',
+      });
+      if (!result.success) {
+        setCloseError(result.error ?? 'Failed to create adjustment entries');
+        setShowCloseConfirm(false);
+        return;
+      }
+    }
+    const closeResult = await closeBook(book.book_id);
+    if (!closeResult.success) {
+      setCloseError(closeResult.error ?? 'Failed to close book');
+      setShowCloseConfirm(false);
+      return;
+    }
+    setShowCloseConfirm(false);
     onClose();
   }
 
@@ -92,9 +140,23 @@ export default function BookSettingsModal({ book, onClose }: Props) {
                 Reopen Book
               </button>
             )}
+            {closeError && (
+              <p className="mt-2 text-xs text-red-600 dark:text-red-400">{closeError}</p>
+            )}
           </div>
         </div>
       </div>
+
+      {showCloseConfirm && (
+        <ConfirmDialog
+          title="Close Book"
+          message={`This book has ${unbalancedLedgers.length} unbalanced ledger${unbalancedLedgers.length === 1 ? '' : 's'}. Closing it will create adjustment entries to bring each ledger back to 0.00. Continue?`}
+          confirmLabel="Force Close"
+          confirmVariant="danger"
+          onConfirm={handleForceClose}
+          onCancel={() => setShowCloseConfirm(false)}
+        />
+      )}
 
       {showReopenConfirm && (
         <ConfirmDialog
