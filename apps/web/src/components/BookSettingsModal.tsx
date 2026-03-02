@@ -14,7 +14,9 @@ export default function BookSettingsModal({ book, onClose }: Props) {
   const { addEntry } = useEntryStore();
   const { getLedgersForBook } = useLedgerStore();
   const ledgers = getLedgersForBook(book.book_id);
-  const unbalancedLedgers = ledgers.filter((ledger) => roundAmount(ledger.balance) !== 0);
+  const unbalancedLedgers = ledgers
+    .map((ledger) => ({ ledger, roundedBalance: roundAmount(ledger.balance) }))
+    .filter(({ roundedBalance }) => roundedBalance !== 0);
   const [name, setName] = useState(book.name);
   const [nameError, setNameError] = useState<string | null>(null);
   const [closeError, setCloseError] = useState<string | null>(null);
@@ -46,12 +48,7 @@ export default function BookSettingsModal({ book, onClose }: Props) {
 
   async function handleForceClose() {
     setCloseError(null);
-    const pendingLedgers = getLedgersForBook(book.book_id).filter(
-      (ledger) => roundAmount(ledger.balance) !== 0,
-    );
-    for (const ledger of pendingLedgers) {
-      const roundedBalance = roundAmount(ledger.balance);
-      if (roundedBalance === 0) continue;
+    for (const { ledger, roundedBalance } of unbalancedLedgers) {
       const result = await addEntry({
         book_id: ledger.book_id,
         ledger_id: ledger.ledger_id,
@@ -150,7 +147,7 @@ export default function BookSettingsModal({ book, onClose }: Props) {
       {showCloseConfirm && (
         <ConfirmDialog
           title="Close Book"
-          message={`This book has ${unbalancedLedgers.length} unbalanced ledger${unbalancedLedgers.length === 1 ? '' : 's'}. Closing it will create adjustment entries to bring each ledger back to 0.00. Continue?`}
+          message={`This book has ${unbalancedLedgers.length} unbalanced ledger${unbalancedLedgers.length === 1 ? '' : 's'}. Closing it will create adjustment entries to bring each ledger to 0.00. Continue?`}
           confirmLabel="Force Close"
           confirmVariant="danger"
           onConfirm={handleForceClose}
