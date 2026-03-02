@@ -1,4 +1,4 @@
-import type { IDBConnection, DBConnectionOptions } from '../connection.js';
+import type { IDBConnection } from '../connection.js';
 
 const IDB_STORE_NAME = 'ledger-sqljs';
 const IDB_DB_NAME = 'ledger-sqljs-store';
@@ -164,72 +164,3 @@ export class WebDBConnection implements IDBConnection {
   }
 }
 
-export async function createWebConnection(
-  name: string,
-  opts: DBConnectionOptions = {},
-): Promise<IDBConnection> {
-  const { persist = true } = opts;
-
-  // Dynamically import sql.js to avoid bundler issues
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const sqlJsModule = (await import('sql.js')) as any;
-  let initSqlJsFrom =
-    (typeof sqlJsModule?.default?.default === 'function' && 'default.default') ||
-    (typeof sqlJsModule?.default === 'function' && 'default') ||
-    (typeof sqlJsModule?.initSqlJs === 'function' && 'initSqlJs') ||
-    (typeof sqlJsModule === 'function' && 'module') ||
-    'unknown';
-  let initSqlJs =
-    sqlJsModule?.default?.default ??
-    sqlJsModule?.default ??
-    sqlJsModule?.initSqlJs ??
-    sqlJsModule;
-  if (typeof initSqlJs !== 'function') {
-    // eslint-disable-next-line no-console
-    console.info('[db] sql.js init export: unknown', {
-      keys: Object.keys(sqlJsModule ?? {}),
-      defaultType: typeof sqlJsModule?.default,
-    });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const sqlJsWasmModule = (await import('sql.js/dist/sql-wasm.js')) as any;
-    initSqlJsFrom =
-      (typeof sqlJsWasmModule?.default?.default === 'function' &&
-        'dist/sql-wasm.default.default') ||
-      (typeof sqlJsWasmModule?.default === 'function' && 'dist/sql-wasm.default') ||
-      (typeof sqlJsWasmModule?.initSqlJs === 'function' && 'dist/sql-wasm.initSqlJs') ||
-      (typeof sqlJsWasmModule === 'function' && 'dist/sql-wasm.module') ||
-      'unknown';
-    initSqlJs =
-      sqlJsWasmModule?.default?.default ??
-      sqlJsWasmModule?.default ??
-      sqlJsWasmModule?.initSqlJs ??
-      sqlJsWasmModule;
-  }
-  // eslint-disable-next-line no-console
-  console.info('[db] sql.js init export:', initSqlJsFrom);
-  if (typeof initSqlJs !== 'function') {
-    throw new Error('sql.js initSqlJs export not found');
-  }
-  const wasmUrl = new URL('sql.js/dist/sql-wasm.wasm', import.meta.url).toString();
-  // eslint-disable-next-line no-console
-  console.info('[db] sql.js wasm url:', wasmUrl);
-  const SQL = await initSqlJs({
-    locateFile: (f: string) => (f.endsWith('.wasm') ? wasmUrl : `/assets/${f}`),
-  });
-
-  let db;
-  if (persist) {
-    const existing = await loadFromIndexedDB(name);
-    if (existing) {
-      db = new SQL.Database(existing);
-    } else {
-      db = new SQL.Database();
-    }
-  } else {
-    db = new SQL.Database();
-  }
-
-  db.run('PRAGMA foreign_keys = ON');
-
-  return new WebDBConnection(db, name, persist);
-}

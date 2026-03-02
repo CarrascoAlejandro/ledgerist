@@ -2,6 +2,7 @@ import type { Entry } from '@ledger/shared';
 
 interface Props {
   entry: Entry;
+  onClick?: () => void;
 }
 
 function formatDate(dateStr: string): string {
@@ -9,11 +10,15 @@ function formatDate(dateStr: string): string {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-export default function EntryListItem({ entry }: Props) {
+export default function EntryListItem({ entry, onClick }: Props) {
   const isAdd = entry.cat_direction === 'add';
 
   return (
-    <div className="flex items-center gap-3 border-b border-gray-100 py-3 dark:border-gray-700">
+    <div
+      className={`flex items-center gap-3 border-b border-gray-100 py-3 dark:border-gray-700${onClick ? ' cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50' : ''}`}
+      onClick={onClick}
+      role={onClick ? 'button' : undefined}
+    >
       <span className="w-14 shrink-0 text-sm text-gray-500 dark:text-gray-400">
         {formatDate(entry.entry_date)}
       </span>
