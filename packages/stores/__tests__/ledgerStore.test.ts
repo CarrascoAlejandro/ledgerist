@@ -163,3 +163,95 @@ describe('setLedgerAlias', () => {
     }
   });
 });
+
+describe('setLedgerColor', () => {
+  it('sets color on ledger and updates state', async () => {
+    const result = await useLedgerStore.getState().setLedgerColor({
+      ledger_id: ledgerId,
+      color: '#ff0000',
+    });
+    expect(result.success).toBe(true);
+    const ledger = useLedgerStore.getState().getLedger(ledgerId);
+    expect(ledger?.ledger_color).toBe('#ff0000');
+  });
+
+  it('clears color when null is passed', async () => {
+    await useLedgerStore.getState().setLedgerColor({ ledger_id: ledgerId, color: '#ff0000' });
+    await useLedgerStore.getState().setLedgerColor({ ledger_id: ledgerId, color: null });
+    const ledger = useLedgerStore.getState().getLedger(ledgerId);
+    expect(ledger?.ledger_color).toBeNull();
+  });
+
+  it('returns NOT_FOUND for nonexistent ledger', async () => {
+    const result = await useLedgerStore.getState().setLedgerColor({
+      ledger_id: 'does-not-exist',
+      color: '#abc',
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.code).toBe('NOT_FOUND');
+    }
+  });
+
+  it('returns PERMISSION_DENIED for closed book', async () => {
+    await useBookStore.getState().closeBook(bookId);
+    await useBookStore.getState().fetchBooks();
+
+    const result = await useLedgerStore.getState().setLedgerColor({
+      ledger_id: ledgerId,
+      color: '#00ff00',
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.code).toBe('PERMISSION_DENIED');
+    }
+  });
+});
+
+describe('setLedgerIcon', () => {
+  it('sets icon on ledger and updates state', async () => {
+    const result = await useLedgerStore.getState().setLedgerIcon({
+      ledger_id: ledgerId,
+      icon: '🚀',
+    });
+    expect(result.success).toBe(true);
+    const ledger = useLedgerStore.getState().getLedger(ledgerId);
+    expect(ledger?.icon).toBe('🚀');
+  });
+
+  it('returns VALIDATION_ERROR on empty string', async () => {
+    const result = await useLedgerStore.getState().setLedgerIcon({
+      ledger_id: ledgerId,
+      icon: '',
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.code).toBe('VALIDATION_ERROR');
+    }
+  });
+
+  it('returns NOT_FOUND for nonexistent ledger', async () => {
+    const result = await useLedgerStore.getState().setLedgerIcon({
+      ledger_id: 'does-not-exist',
+      icon: '🎯',
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.code).toBe('NOT_FOUND');
+    }
+  });
+
+  it('returns PERMISSION_DENIED for closed book', async () => {
+    await useBookStore.getState().closeBook(bookId);
+    await useBookStore.getState().fetchBooks();
+
+    const result = await useLedgerStore.getState().setLedgerIcon({
+      ledger_id: ledgerId,
+      icon: '🎯',
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.code).toBe('PERMISSION_DENIED');
+    }
+  });
+});

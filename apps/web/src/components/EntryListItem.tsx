@@ -1,3 +1,4 @@
+import React from 'react';
 import type { Entry } from '@ledger/shared';
 
 interface Props {
@@ -10,7 +11,7 @@ function formatDate(dateStr: string): string {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-export default function EntryListItem({ entry, onClick }: Props) {
+function EntryListItem({ entry, onClick }: Props) {
   const isAdd = entry.cat_direction === 'add';
 
   return (
@@ -41,3 +42,5 @@ export default function EntryListItem({ entry, onClick }: Props) {
     </div>
   );
 }
+
+export default React.memo(EntryListItem);

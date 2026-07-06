@@ -3,6 +3,7 @@ import { createQueries } from '@ledger/database';
 import { validateBookName } from '@ledger/shared';
 import type { Book, ActionResult } from '@ledger/shared';
 import { getDB } from './db.js';
+import { useLedgerStore } from './ledgerStore.js';
 
 interface BookState {
   books: Book[];
@@ -19,6 +20,10 @@ interface BookActions {
   closeBook(book_id: string): Promise<ActionResult<Book>>;
   reopenBook(book_id: string): Promise<ActionResult<Book>>;
   deleteBook(book_id: string): Promise<ActionResult>;
+  setAutoOpenBook(book_id: string, enable: boolean): Promise<ActionResult<Book>>;
+  forceRebalanceAndCloseBook(book_id: string): Promise<ActionResult<{
+    adjustments: Array<{ ledger_id: string; ledger_name: string; amount: number; direction: 'add' | 'sub' }>;
+  }>>;
 
   // Getters
   getBookById(id: string): Book | null;
@@ -205,6 +210,122 @@ export const useBookStore = create<BookState & BookActions>((set, get) => ({
           state.currentBook?.book_id === book_id ? null : state.currentBook,
       }));
       return { success: true };
+    } catch (e) {
+      return { success: false, error: String(e), code: 'DATABASE_ERROR' };
+    }
+  },
+
+  async setAutoOpenBook(book_id, enable) {
+    const book = get().books.find((b) => b.book_id === book_id);
+    if (!book) {
+      return { success: false, error: 'Book not found', code: 'NOT_FOUND' };
+    }
+    try {
+      const q = createQueries(getDB());
+      if (enable) {
+        // Clear any other auto-open book first
+        for (const b of get().books) {
+          if (b.book_id !== book_id && b.is_auto_open === 1) {
+            await q.setBookAutoOpen(b.book_id, 0);
+          }
+        }
+        await q.setBookAutoOpen(book_id, 1);
+        set((state) => ({
+          books: state.books.map((b) => ({ ...b, is_auto_open: b.book_id === book_id ? 1 : 0 })),
+          currentBook:
+            state.currentBook
+              ? { ...state.currentBook, is_auto_open: state.currentBook.book_id === book_id ? 1 : 0 }
+              : null,
+        }));
+      } else {
+        await q.setBookAutoOpen(book_id, 0);
+        set((state) => ({
+          books: state.books.map((b) =>
+            b.book_id === book_id ? { ...b, is_auto_open: 0 } : b,
+          ),
+          currentBook:
+            state.currentBook?.book_id === book_id
+              ? { ...state.currentBook, is_auto_open: 0 }
+              : state.currentBook,
+        }));
+      }
+      const updated = get().books.find((b) => b.book_id === book_id) ?? null;
+      if (!updated) {
+        return { success: false, error: 'Book not found after update', code: 'NOT_FOUND' };
+      }
+      return { success: true, data: updated };
+    } catch (e) {
+      return { success: false, error: String(e), code: 'DATABASE_ERROR' };
+    }
+  },
+
+  async forceRebalanceAndCloseBook(book_id) {
+    const book = get().books.find((b) => b.book_id === book_id);
+    if (!book) {
+      return { success: false, error: 'Book not found', code: 'NOT_FOUND' };
+    }
+    if (book.is_closed === 1) {
+      return { success: false, error: 'Book is already closed', code: 'PERMISSION_DENIED' };
+    }
+
+    try {
+      const db = getDB();
+      const ledgers = useLedgerStore.getState().getLedgersForBook(book_id);
+      const unbalanced = ledgers.filter((l) => l.balance !== 0);
+
+      const adjustments: Array<{ ledger_id: string; ledger_name: string; amount: number; direction: 'add' | 'sub' }> =
+        unbalanced.map((l) => ({
+          ledger_id: l.ledger_id,
+          ledger_name: l.ledger_name,
+          amount: Math.abs(l.balance),
+          direction: l.balance > 0 ? 'sub' : 'add',
+        }));
+
+      const today = new Date().toISOString().slice(0, 10);
+      const ops: Array<{ sql: string; params?: unknown[] }> = [];
+
+      for (const adj of adjustments) {
+        const entry_id = crypto.randomUUID();
+        ops.push({
+          sql: `INSERT INTO entries
+                  (entry_id, ledger_id, book_id, entry_date, detail, amount, cat_direction, transfer_group_id, status)
+                VALUES (?, ?, ?, ?, 'Balance adjustment', ?, ?, NULL, 1)`,
+          params: [entry_id, adj.ledger_id, book_id, today, adj.amount, adj.direction],
+        });
+        ops.push({
+          sql: `UPDATE ledgers SET balance = 0, updated_at = datetime('now','utc') WHERE ledger_id = ?`,
+          params: [adj.ledger_id],
+        });
+      }
+
+      ops.push({
+        sql: `UPDATE books SET is_balanced = 1, is_closed = 1, updated_at = datetime('now','utc') WHERE book_id = ?`,
+        params: [book_id],
+      });
+
+      await db.transaction(ops);
+
+      // Patch ledger balances to 0
+      if (unbalanced.length > 0) {
+        const adjustedIds = new Set(unbalanced.map((l) => l.ledger_id));
+        useLedgerStore.setState((state) => ({
+          ledgers: state.ledgers.map((l) =>
+            adjustedIds.has(l.ledger_id) ? { ...l, balance: 0 } : l,
+          ),
+        }));
+      }
+
+      set((state) => ({
+        books: state.books.map((b) =>
+          b.book_id === book_id ? { ...b, is_balanced: 1, is_closed: 1 } : b,
+        ),
+        currentBook:
+          state.currentBook?.book_id === book_id
+            ? { ...state.currentBook, is_balanced: 1, is_closed: 1 }
+            : state.currentBook,
+      }));
+
+      return { success: true, data: { adjustments } };
     } catch (e) {
       return { success: false, error: String(e), code: 'DATABASE_ERROR' };
     }

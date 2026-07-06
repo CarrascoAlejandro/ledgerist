@@ -1,3 +1,4 @@
+import React from 'react';
 import type { Ledger, Entry } from '@ledger/shared';
 import EntryListItem from './EntryListItem.js';
 
@@ -16,7 +17,7 @@ function formatBalance(balance: number): string {
   return `${sign}${balance.toFixed(2)}`;
 }
 
-export default function LedgerSection({
+function LedgerSection({
   ledger,
   entries,
   isCollapsed,
@@ -31,8 +32,13 @@ export default function LedgerSection({
 
   const isPositive = ledger.balance >= 0;
 
+  const hasColor = !!ledger.ledger_color;
+
   return (
-    <div className="rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
+    <div
+      className={`rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800${hasColor ? ' border-l-4' : ''}`}
+      style={hasColor ? { borderLeftColor: ledger.ledger_color ?? undefined } : undefined}
+    >
       {/* Header row */}
       <div className="flex items-center">
         <button
@@ -101,3 +107,5 @@ export default function LedgerSection({
     </div>
   );
 }
+
+export default React.memo(LedgerSection);

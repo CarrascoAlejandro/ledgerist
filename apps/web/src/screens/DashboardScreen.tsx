@@ -14,7 +14,13 @@ export default function DashboardScreen() {
 
   useEffect(() => {
     useSettingsStore.getState().loadSettings();
-    useBookStore.getState().fetchBooks();
+    useBookStore.getState().fetchBooks().then(() => {
+      const autoOpen = useBookStore.getState().getAutoOpenBook();
+      if (autoOpen) {
+        useBookStore.getState().openBook(autoOpen.book_id);
+        navigate(`/book/${autoOpen.book_id}`);
+      }
+    });
   }, []);
 
   async function handleCreate() {

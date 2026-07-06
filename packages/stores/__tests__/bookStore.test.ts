@@ -5,7 +5,7 @@ import fs from 'fs';
 import path from 'path';
 import { WebDBConnection, runMigrations } from '@ledger/database';
 import type { IDBConnection } from '@ledger/database';
-import { useBookStore, setDB } from '../src/index.js';
+import { useBookStore, useLedgerStore, setDB } from '../src/index.js';
 
 async function createTestDB(): Promise<IDBConnection> {
   // Load WASM binary directly to bypass jsdom browser-mode detection in sql.js
@@ -29,6 +29,7 @@ beforeEach(async () => {
   setDB(conn);
   // Reset store state
   useBookStore.setState({ books: [], currentBook: null, loading: false, error: null });
+  useLedgerStore.setState({ ledgers: [], currentBook_id: null, collapsed: {}, loading: false, error: null });
 });
 
 afterEach(async () => {
@@ -199,5 +200,133 @@ describe('Getters', () => {
     await useBookStore.getState().createBook({ name: 'Regular' });
     const autoOpen = useBookStore.getState().getAutoOpenBook();
     expect(autoOpen).toBeNull();
+  });
+});
+
+describe('setAutoOpenBook', () => {
+  it('sets is_auto_open to 1 on target book', async () => {
+    const create = await useBookStore.getState().createBook({ name: 'AutoBook' });
+    const book_id = (create as { success: true; data: { book_id: string } }).data.book_id;
+
+    const result = await useBookStore.getState().setAutoOpenBook(book_id, true);
+    expect(result.success).toBe(true);
+    const book = useBookStore.getState().books.find((b) => b.book_id === book_id);
+    expect(book?.is_auto_open).toBe(1);
+  });
+
+  it('only one book can be auto-open at a time', async () => {
+    const r1 = await useBookStore.getState().createBook({ name: 'Book1' });
+    const r2 = await useBookStore.getState().createBook({ name: 'Book2' });
+    const id1 = (r1 as { success: true; data: { book_id: string } }).data.book_id;
+    const id2 = (r2 as { success: true; data: { book_id: string } }).data.book_id;
+
+    await useBookStore.getState().setAutoOpenBook(id1, true);
+    await useBookStore.getState().setAutoOpenBook(id2, true);
+
+    const books = useBookStore.getState().books;
+    expect(books.find((b) => b.book_id === id1)?.is_auto_open).toBe(0);
+    expect(books.find((b) => b.book_id === id2)?.is_auto_open).toBe(1);
+  });
+
+  it('enable=false sets is_auto_open to 0', async () => {
+    const create = await useBookStore.getState().createBook({ name: 'AutoOff' });
+    const book_id = (create as { success: true; data: { book_id: string } }).data.book_id;
+
+    await useBookStore.getState().setAutoOpenBook(book_id, true);
+    await useBookStore.getState().setAutoOpenBook(book_id, false);
+
+    const book = useBookStore.getState().books.find((b) => b.book_id === book_id);
+    expect(book?.is_auto_open).toBe(0);
+  });
+
+  it('getAutoOpenBook returns the auto-open book after setting', async () => {
+    const create = await useBookStore.getState().createBook({ name: 'AutoFind' });
+    const book_id = (create as { success: true; data: { book_id: string } }).data.book_id;
+
+    await useBookStore.getState().setAutoOpenBook(book_id, true);
+    const autoOpen = useBookStore.getState().getAutoOpenBook();
+    expect(autoOpen?.book_id).toBe(book_id);
+  });
+
+  it('returns NOT_FOUND for nonexistent book', async () => {
+    const result = await useBookStore.getState().setAutoOpenBook('nonexistent', true);
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.code).toBe('NOT_FOUND');
+    }
+  });
+});
+
+describe('forceRebalanceAndCloseBook', () => {
+  it('returns PERMISSION_DENIED on already-closed book', async () => {
+    const create = await useBookStore.getState().createBook({ name: 'ClosedBook' });
+    const book_id = (create as { success: true; data: { book_id: string } }).data.book_id;
+    await useLedgerStore.getState().fetchLedgers(book_id);
+    await useBookStore.getState().closeBook(book_id);
+
+    const result = await useBookStore.getState().forceRebalanceAndCloseBook(book_id);
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.code).toBe('PERMISSION_DENIED');
+    }
+  });
+
+  it('sets is_balanced=1 and is_closed=1 on book', async () => {
+    const create = await useBookStore.getState().createBook({ name: 'ToBalance' });
+    const book_id = (create as { success: true; data: { book_id: string } }).data.book_id;
+    await useLedgerStore.getState().fetchLedgers(book_id);
+
+    const result = await useBookStore.getState().forceRebalanceAndCloseBook(book_id);
+    expect(result.success).toBe(true);
+
+    const book = useBookStore.getState().books.find((b) => b.book_id === book_id);
+    expect(book?.is_balanced).toBe(1);
+    expect(book?.is_closed).toBe(1);
+  });
+
+  it('creates adjustment entries for ledgers with non-zero balance', async () => {
+    const { createQueries } = await import('@ledger/database');
+    const create = await useBookStore.getState().createBook({ name: 'WithBalance' });
+    const book_id = (create as { success: true; data: { book_id: string } }).data.book_id;
+
+    const ledgerResult = await useLedgerStore.getState().createLedger({
+      book_id,
+      ledger_name: 'Cash',
+    });
+    const ledger_id = (ledgerResult as { success: true; data: { ledger_id: string } }).data.ledger_id;
+
+    // Inject balance directly via query
+    const q = createQueries(conn);
+    await q.updateLedgerBalance(ledger_id, 100);
+    // Sync store state
+    await useLedgerStore.getState().fetchLedgers(book_id);
+
+    const result = await useBookStore.getState().forceRebalanceAndCloseBook(book_id);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.adjustments).toHaveLength(1);
+      expect(result.data.adjustments[0].direction).toBe('sub');
+      expect(result.data.adjustments[0].amount).toBe(100);
+    }
+
+    // Ledger balance should be 0 in store
+    const ledger = useLedgerStore.getState().getLedger(ledger_id);
+    expect(ledger?.balance).toBe(0);
+  });
+
+  it('returns empty adjustments when all balances are 0 but still closes book', async () => {
+    const create = await useBookStore.getState().createBook({ name: 'ZeroBalance' });
+    const book_id = (create as { success: true; data: { book_id: string } }).data.book_id;
+    await useLedgerStore.getState().createLedger({ book_id, ledger_name: 'Empty' });
+    await useLedgerStore.getState().fetchLedgers(book_id);
+
+    const result = await useBookStore.getState().forceRebalanceAndCloseBook(book_id);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.adjustments).toHaveLength(0);
+    }
+
+    const book = useBookStore.getState().books.find((b) => b.book_id === book_id);
+    expect(book?.is_closed).toBe(1);
   });
 });

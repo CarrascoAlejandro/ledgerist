@@ -1,7 +1,9 @@
 import { useState } from 'react';
-import { useLedgerStore, useEntryStore } from '@ledger/stores';
+import { useLedgerStore, useEntryStore, useBookStore } from '@ledger/stores';
 import type { Ledger } from '@ledger/shared';
 import ConfirmDialog from './ConfirmDialog.js';
+import EmojiPickerModal from './EmojiPickerModal.js';
+import ColorPickerModal from './ColorPickerModal.js';
 
 interface Props {
   ledger: Ledger;
@@ -9,14 +11,20 @@ interface Props {
 }
 
 export default function LedgerSettingsModal({ ledger, onClose }: Props) {
-  const { renameLedger, setLedgerAlias, deleteLedger } = useLedgerStore();
+  const { renameLedger, setLedgerAlias, setLedgerColor, setLedgerIcon, deleteLedger } = useLedgerStore();
   const { getEntriesForLedger } = useEntryStore();
+  const book = useBookStore.getState().books.find((b) => b.book_id === ledger.book_id);
+  const isBookClosed = book?.is_closed === 1;
 
   const [ledgerName, setLedgerName] = useState(ledger.ledger_name);
   const [nameError, setNameError] = useState<string | null>(null);
   const [alias, setAlias] = useState(ledger.alias ?? '');
   const [aliasError, setAliasError] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showColorPicker, setShowColorPicker] = useState(false);
+  const [currentIcon, setCurrentIcon] = useState(ledger.icon);
+  const [currentColor, setCurrentColor] = useState<string | null>(ledger.ledger_color ?? null);
 
   const entryCount = getEntriesForLedger(ledger.ledger_id).length;
 
@@ -45,6 +53,16 @@ export default function LedgerSettingsModal({ ledger, onClose }: Props) {
   async function handleDelete() {
     await deleteLedger({ ledger_id: ledger.ledger_id, book_id: ledger.book_id });
     onClose();
+  }
+
+  async function handleSelectIcon(emoji: string) {
+    const result = await setLedgerIcon({ ledger_id: ledger.ledger_id, icon: emoji });
+    if (result.success) setCurrentIcon(emoji);
+  }
+
+  async function handleSelectColor(color: string | null) {
+    const result = await setLedgerColor({ ledger_id: ledger.ledger_id, color });
+    if (result.success) setCurrentColor(color);
   }
 
   return (
@@ -120,6 +138,37 @@ export default function LedgerSettingsModal({ ledger, onClose }: Props) {
             </p>
           </div>
 
+          {/* Icon */}
+          <div className="mb-4">
+            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Icon
+            </label>
+            <button
+              onClick={() => !isBookClosed && setShowEmojiPicker(true)}
+              disabled={isBookClosed}
+              className="flex h-10 w-10 items-center justify-center rounded-md border border-gray-300 text-xl transition hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:hover:bg-gray-700"
+              aria-label="Change icon"
+            >
+              {currentIcon}
+            </button>
+          </div>
+
+          {/* Color */}
+          <div className="mb-6">
+            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Color accent
+            </label>
+            <button
+              onClick={() => !isBookClosed && setShowColorPicker(true)}
+              disabled={isBookClosed}
+              className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-gray-300 transition hover:scale-110 disabled:opacity-50 dark:border-gray-600"
+              style={{ backgroundColor: currentColor ?? undefined }}
+              aria-label="Change color"
+            >
+              {!currentColor && <span className="text-xs text-gray-400">∅</span>}
+            </button>
+          </div>
+
           {/* Danger Zone */}
           <div className="border-t border-gray-100 pt-4 dark:border-gray-700">
             <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-400">
@@ -147,6 +196,22 @@ export default function LedgerSettingsModal({ ledger, onClose }: Props) {
           confirmVariant="danger"
           onConfirm={handleDelete}
           onCancel={() => setShowDeleteConfirm(false)}
+        />
+      )}
+
+      {showEmojiPicker && (
+        <EmojiPickerModal
+          currentIcon={currentIcon}
+          onSelect={handleSelectIcon}
+          onClose={() => setShowEmojiPicker(false)}
+        />
+      )}
+
+      {showColorPicker && (
+        <ColorPickerModal
+          currentColor={currentColor}
+          onSelect={handleSelectColor}
+          onClose={() => setShowColorPicker(false)}
         />
       )}
     </>

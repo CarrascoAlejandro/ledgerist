@@ -5,9 +5,26 @@ import type { Ledger, ActionResult } from '@ledger/shared';
 import { getDB } from './db.js';
 import { useBookStore } from './bookStore.js';
 
-const EMOJI_POOL = [
-  '💰', '💵', '🏦', '📊', '🛒', '🏠', '🚗', '✈️', '🎓', '💊',
-  '🎬', '☕', '🍔', '👔', '🎮', '💡', '📱', '🏥', '🎁', '💳',
+export const EMOJI_POOL = [
+  // Finance & money
+  '💰', '💵', '💴', '💶', '💷', '💳', '🏦', '📊', '📈', '📉',
+  '🪙', '💸', '🤑', '🧾', '💼',
+  // Home & living
+  '🏠', '🏡', '🛋️', '🪑', '🛏️', '🚿', '💡', '🔌', '🔧', '🪴',
+  // Food & drink
+  '🍔', '🍕', '🌮', '🍣', '🍜', '☕', '🍷', '🛒', '🧺', '🍎',
+  // Transport
+  '🚗', '✈️', '🚌', '🚲', '⛽', '🛵', '🚂', '🚢', '🛺', '🏍️',
+  // Health
+  '💊', '🏥', '🩺', '🏋️', '🧘', '🥗', '💉', '🩹', '😷', '🧬',
+  // Education
+  '🎓', '📚', '✏️', '🖥️', '📐', '🔬', '📝', '🎒', '🏫', '📖',
+  // Entertainment
+  '🎬', '🎮', '🎵', '🎭', '🎨', '🎲', '🎯', '🎪', '🎠', '🎶',
+  // Work & tools
+  '👔', '📱', '💻', '🖨️', '📞', '🗂️', '📋', '🗃️', '🖋️', '📬',
+  // Gifts & misc
+  '🎁', '🌟', '⭐', '🌈', '🔑', '🏆', '🎗️', '🧩', '🪆', '🌺',
 ];
 
 function randomEmoji(): string {
@@ -36,6 +53,8 @@ interface LedgerActions {
     alias: string | null;
     book_id: string;
   }): Promise<ActionResult<Ledger>>;
+  setLedgerColor(input: { ledger_id: string; color: string | null }): Promise<ActionResult<Ledger>>;
+  setLedgerIcon(input: { ledger_id: string; icon: string }): Promise<ActionResult<Ledger>>;
   deleteLedger(input: { ledger_id: string; book_id: string }): Promise<ActionResult>;
 
   // Getters
@@ -166,6 +185,63 @@ export const useLedgerStore = create<LedgerState & LedgerActions>((set, get) => 
       set((state) => ({
         ledgers: state.ledgers.map((l) =>
           l.ledger_id === ledger_id ? { ...l, alias: resolvedAlias } : l,
+        ),
+      }));
+      const updated = get().ledgers.find((l) => l.ledger_id === ledger_id) ?? null;
+      if (!updated) {
+        return { success: false, error: 'Ledger not found after update', code: 'NOT_FOUND' };
+      }
+      return { success: true, data: updated };
+    } catch (e) {
+      return { success: false, error: String(e), code: 'DATABASE_ERROR' };
+    }
+  },
+
+  async setLedgerColor({ ledger_id, color }) {
+    const ledger = get().ledgers.find((l) => l.ledger_id === ledger_id);
+    if (!ledger) {
+      return { success: false, error: 'Ledger not found', code: 'NOT_FOUND' };
+    }
+    const book = useBookStore.getState().books.find((b) => b.book_id === ledger.book_id);
+    if (book?.is_closed) {
+      return { success: false, error: 'Cannot update color in a closed book', code: 'PERMISSION_DENIED' };
+    }
+    try {
+      const q = createQueries(getDB());
+      await q.updateLedgerColor(ledger_id, color ?? null);
+      set((state) => ({
+        ledgers: state.ledgers.map((l) =>
+          l.ledger_id === ledger_id ? { ...l, ledger_color: color ?? null } : l,
+        ),
+      }));
+      const updated = get().ledgers.find((l) => l.ledger_id === ledger_id) ?? null;
+      if (!updated) {
+        return { success: false, error: 'Ledger not found after update', code: 'NOT_FOUND' };
+      }
+      return { success: true, data: updated };
+    } catch (e) {
+      return { success: false, error: String(e), code: 'DATABASE_ERROR' };
+    }
+  },
+
+  async setLedgerIcon({ ledger_id, icon }) {
+    const ledger = get().ledgers.find((l) => l.ledger_id === ledger_id);
+    if (!ledger) {
+      return { success: false, error: 'Ledger not found', code: 'NOT_FOUND' };
+    }
+    const book = useBookStore.getState().books.find((b) => b.book_id === ledger.book_id);
+    if (book?.is_closed) {
+      return { success: false, error: 'Cannot update icon in a closed book', code: 'PERMISSION_DENIED' };
+    }
+    if (!icon.trim()) {
+      return { success: false, error: 'Icon cannot be empty', code: 'VALIDATION_ERROR' };
+    }
+    try {
+      const q = createQueries(getDB());
+      await q.updateLedgerIcon(ledger_id, icon);
+      set((state) => ({
+        ledgers: state.ledgers.map((l) =>
+          l.ledger_id === ledger_id ? { ...l, icon } : l,
         ),
       }));
       const updated = get().ledgers.find((l) => l.ledger_id === ledger_id) ?? null;
