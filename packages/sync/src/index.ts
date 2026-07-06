@@ -58,6 +58,13 @@ export {
 export type { PairingOffer, PairingPayload } from './engine/pairing.js';
 export { createAcceptor, dialAndSync } from './engine/sessionRunner.js';
 export type { RunnerDeps } from './engine/sessionRunner.js';
+export {
+  countUnseenConflicts,
+  listConflicts,
+  markConflictsSeen,
+  renameDevice,
+} from './engine/conflicts.js';
+export type { ConflictKind, SyncConflict } from './engine/conflicts.js';
 export { WsTransportClient } from './transport/wsClient.js';
 export type { WebSocketCtor, WebSocketLike } from './transport/wsClient.js';
 export { ElectronRelayServer, getElectronSyncAPI } from './transport/electronRelay.js';

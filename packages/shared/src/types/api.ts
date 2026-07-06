@@ -81,6 +81,7 @@ export type ScreenName =
   | 'ledger_detail'
   | 'entry_form'
   | 'settings'
+  | 'sync'
   | 'import'
   | 'export';
 

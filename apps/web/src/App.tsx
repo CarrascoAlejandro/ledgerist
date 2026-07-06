@@ -4,6 +4,7 @@ import DashboardScreen from './screens/DashboardScreen.js';
 
 const BookOverviewScreen = lazy(() => import('./screens/BookOverviewScreen.js'));
 const AppSettingsScreen = lazy(() => import('./screens/AppSettingsScreen.js'));
+const SyncScreen = lazy(() => import('./screens/SyncScreen.js'));
 
 export default function App() {
   return (
@@ -13,6 +14,7 @@ export default function App() {
           <Route path="/" element={<DashboardScreen />} />
           <Route path="/book/:bookId" element={<BookOverviewScreen />} />
           <Route path="/settings" element={<AppSettingsScreen />} />
+          <Route path="/settings/sync" element={<SyncScreen />} />
         </Routes>
       </Suspense>
     </BrowserRouter>

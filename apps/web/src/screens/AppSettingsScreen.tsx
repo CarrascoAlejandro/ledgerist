@@ -53,6 +53,21 @@ export default function AppSettingsScreen() {
 
         {!loading && settings && (
           <div className="flex flex-col gap-4">
+            <button
+              onClick={() => navigate('/settings/sync')}
+              className="rounded-lg border border-gray-200 bg-white p-4 text-left shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Device Sync
+                </span>
+                <span className="text-sm text-gray-400 dark:text-gray-500">→</span>
+              </div>
+              <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+                Pair devices and sync your books over the local network
+              </p>
+            </button>
+
             <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">

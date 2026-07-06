@@ -10,6 +10,7 @@
   "dependencies": {
     "@ledger/shared": "*",
     "@ledger/database": "*",
+    "@ledger/sync": "*",
     "zustand": "^4.5.4"
   }
 }
