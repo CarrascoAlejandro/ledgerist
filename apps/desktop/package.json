@@ -2,6 +2,9 @@
   "name": "@ledger/desktop",
   "version": "0.0.1",
   "private": true,
+  "description": "Ledger — local-first personal ledger app (desktop)",
+  "author": "Alejandro Carrasco <carrascoalejandro2003@gmail.com>",
+  "homepage": "https://github.com/CarrascoAlejandro/project-ledger-shredder",
   "main": "dist/main.js",
   "scripts": {
     "build:web": "npm run build -w @ledger/web",
@@ -12,17 +15,19 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "better-sqlite3": "^11.1.2",
-    "electron": "^31.3.1"
+    "better-sqlite3": "^11.1.2"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.11",
+    "electron": "^31.3.1",
     "esbuild": "^0.23.0",
     "electron-builder": "^24.13.3"
   },
   "build": {
     "appId": "com.ledger.desktop",
     "productName": "Ledger",
+    "electronVersion": "31.7.7",
+    "artifactName": "${productName}_${version}_${arch}.${ext}",
     "files": [
       "dist/**/*"
     ],
