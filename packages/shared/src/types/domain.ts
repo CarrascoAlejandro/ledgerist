@@ -7,6 +7,8 @@ export interface Book {
   status: 0 | 1;
   created_at: string;
   updated_at: string | null;
+  version_hlc?: string | null;
+  origin_device_id?: string | null;
 }
 
 export type NewBook = Omit<Book, 'book_id' | 'created_at' | 'updated_at'>;
@@ -22,6 +24,8 @@ export interface Ledger {
   status: 0 | 1;
   created_at: string;
   updated_at: string | null;
+  version_hlc?: string | null;
+  origin_device_id?: string | null;
 }
 
 export type NewLedger = Omit<Ledger, 'ledger_id' | 'balance' | 'created_at' | 'updated_at'>;
@@ -40,6 +44,8 @@ export interface Entry {
   status: 0 | 1;
   created_at: string;
   updated_at: string | null;
+  version_hlc?: string | null;
+  origin_device_id?: string | null;
 }
 
 export type NewEntry = Omit<Entry, 'entry_id' | 'created_at' | 'updated_at'>;

@@ -1,0 +1,85 @@
+@startuml components
+title P2P Sync — Component Architecture
+
+skinparam componentStyle rectangle
+skinparam shadowing false
+
+package "packages/shared" {
+  [HLC clock\n(hlc.ts)] as HLC
+}
+
+package "packages/database" {
+  [IDBConnection] as IDB
+  [Migration 002_sync\n(columns, tables, triggers)] as MIG
+  [syncStamp() helper\n(queries.ts)] as STAMP
+}
+
+package "packages/sync" {
+  [SyncEngine] as ENGINE
+  [Merge pipeline\n(LWW + post-passes)] as MERGE
+  [Delta collector\n(sync_change_log)] as COLLECT
+  [Pairing\n(host + joiner)] as PAIR
+  [SecureChannel\n(HMAC auth, HKDF, AES-GCM)] as SEC
+  interface "PeerChannel" as PC
+  interface "TransportClient" as TC
+  interface "TransportServer" as TS
+  [wsClient] as WSC
+  [electronRelay] as REL
+}
+
+package "packages/stores" {
+  [syncStore\n(Zustand)] as STORE
+}
+
+node "Electron shell (desktop)" {
+  [Renderer\n(React app + SyncEngine)] as ERENDER
+  [Main process\nws TransportServer\n(dumb frame relay, no keys)] as EMAIN
+}
+
+node "Capacitor shell (Android)" {
+  [Webview\n(React app + SyncEngine)\nWebSocket client] as CAP
+}
+
+node "Browser shell" {
+  [Tab\n(React app + SyncEngine)\nWebSocket client] as BROW
+}
+
+ENGINE --> MERGE
+ENGINE --> COLLECT
+ENGINE --> PAIR
+ENGINE --> SEC
+SEC -down-( PC : wraps
+WSC .up.|> PC
+WSC .up.|> TC
+REL .up.|> PC
+ENGINE --> IDB : reads/writes via
+MERGE --> HLC : receive()
+STAMP --> HLC : now()
+COLLECT --> MIG : sync_change_log
+STORE --> ENGINE : syncNow / pair / unpair
+
+ERENDER --> REL
+REL <..> EMAIN : IPC frames\n(sync:frame, sync:send)
+EMAIN .up.|> TS
+CAP --> WSC
+BROW --> WSC
+WSC ..> EMAIN : ws://host:port (LAN)
+
+cloud "Future: Internet transport" as FUT #line.dashed {
+  [WebRTC DataChannel\n+ minimal signaling] as RTC #line.dashed
+}
+RTC .up.|> PC #line.dashed
+
+note bottom of EMAIN
+  Only Electron can listen.
+  v1: phone<->phone and browser<->browser
+  converge transitively via a desktop.
+end note
+
+note right of SEC
+  Protocol is byte-stream agnostic:
+  any PeerChannel implementation
+  works unchanged.
+end note
+
+@enduml

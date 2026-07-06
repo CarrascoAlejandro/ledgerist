@@ -1,7 +1,12 @@
+export interface DBOperation {
+  sql: string;
+  params?: unknown[];
+}
+
 export interface IDBConnection {
   query<T>(sql: string, params?: unknown[]): Promise<T[]>;
   run(sql: string, params?: unknown[]): Promise<{ lastID?: number; changes?: number }>;
-  transaction(ops: Array<{ sql: string; params?: unknown[] }>): Promise<void>;
+  transaction(ops: DBOperation[]): Promise<void>;
   isOpen(): boolean;
   close(): Promise<void>;
 }

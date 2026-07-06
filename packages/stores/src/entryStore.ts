@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import { createQueries } from '@ledger/database';
+import { buildOps, createQueries } from '@ledger/database';
+import type { DBOperation } from '@ledger/database';
 import {
   validateAmount,
   validateISODate,
@@ -156,25 +157,16 @@ export const useEntryStore = create<EntryState & EntryActions>((set, get) => ({
       const newBalance = applyEntryToBalance(ledger.balance, data.amount, data.cat_direction);
 
       await db.transaction([
-        {
-          sql: `INSERT INTO entries
-                  (entry_id, ledger_id, book_id, entry_date, detail, amount, cat_direction, transfer_group_id, status)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)`,
-          params: [
-            entry_id,
-            data.ledger_id,
-            data.book_id,
-            data.entry_date,
-            data.detail ?? null,
-            data.amount,
-            data.cat_direction,
-            data.transfer_group_id ?? null,
-          ],
-        },
-        {
-          sql: `UPDATE ledgers SET balance = ?, updated_at = datetime('now','utc') WHERE ledger_id = ?`,
-          params: [newBalance, data.ledger_id],
-        }, // TODO: SQL should be in queries file, not here
+        buildOps.insertEntry(entry_id, {
+          ledger_id: data.ledger_id,
+          book_id: data.book_id,
+          entry_date: data.entry_date,
+          detail: data.detail ?? null,
+          amount: data.amount,
+          cat_direction: data.cat_direction,
+          transfer_group_id: data.transfer_group_id ?? null,
+        }),
+        buildOps.updateLedgerBalance(data.ledger_id, newBalance),
       ]);
 
       const entry = await q.getEntryById(entry_id);
@@ -245,41 +237,14 @@ export const useEntryStore = create<EntryState & EntryActions>((set, get) => ({
       let newBalance = reverseEntryFromBalance(ledger.balance, entry.amount, entry.cat_direction);
       newBalance = applyEntryToBalance(newBalance, newAmount, newDirection);
 
-      // Build UPDATE SQL for entry fields
-      const entryParts: string[] = [];
-      const entryParams: unknown[] = [];
-      if (updates.entry_date !== undefined) {
-        entryParts.push('entry_date = ?');
-        entryParams.push(updates.entry_date);
-      }
-      if (updates.detail !== undefined) {
-        entryParts.push('detail = ?');
-        entryParams.push(updates.detail);
-      }
-      if (updates.amount !== undefined) {
-        entryParts.push('amount = ?');
-        entryParams.push(updates.amount);
-      }
-      if (updates.cat_direction !== undefined) {
-        entryParts.push('cat_direction = ?');
-        entryParams.push(updates.cat_direction);
+      const ops: DBOperation[] = [];
+
+      const entryUpdateOp = buildOps.updateEntryFields(entry_id, updates);
+      if (entryUpdateOp) {
+        ops.push(entryUpdateOp);
       }
 
-      const ops: Array<{ sql: string; params?: unknown[] }> = [];
-
-      if (entryParts.length > 0) {
-        entryParts.push("updated_at = datetime('now','utc')");
-        entryParams.push(entry_id);
-        ops.push({
-          sql: `UPDATE entries SET ${entryParts.join(', ')} WHERE entry_id = ?`,
-          params: entryParams,
-        });
-      }
-
-      ops.push({
-        sql: `UPDATE ledgers SET balance = ?, updated_at = datetime('now','utc') WHERE ledger_id = ?`,
-        params: [newBalance, entry.ledger_id],
-      });
+      ops.push(buildOps.updateLedgerBalance(entry.ledger_id, newBalance));
 
       // Sync transfer pair amount if changed
       if (entry.transfer_group_id && updates.amount !== undefined) {
@@ -296,14 +261,11 @@ export const useEntryStore = create<EntryState & EntryActions>((set, get) => ({
               paired.cat_direction,
             );
             pairedBalance = applyEntryToBalance(pairedBalance, newAmount, paired.cat_direction);
-            ops.push({
-              sql: `UPDATE entries SET amount = ?, updated_at = datetime('now','utc') WHERE entry_id = ?`,
-              params: [newAmount, paired.entry_id],
-            });
-            ops.push({
-              sql: `UPDATE ledgers SET balance = ?, updated_at = datetime('now','utc') WHERE ledger_id = ?`,
-              params: [pairedBalance, paired.ledger_id],
-            });
+            const pairedOp = buildOps.updateEntryFields(paired.entry_id, { amount: newAmount });
+            if (pairedOp) {
+              ops.push(pairedOp);
+            }
+            ops.push(buildOps.updateLedgerBalance(paired.ledger_id, pairedBalance));
           }
         }
       }
@@ -358,15 +320,9 @@ export const useEntryStore = create<EntryState & EntryActions>((set, get) => ({
 
       const newBalance = reverseEntryFromBalance(ledger.balance, entry.amount, entry.cat_direction);
 
-      const ops: Array<{ sql: string; params?: unknown[] }> = [
-        {
-          sql: `UPDATE entries SET status = 0, updated_at = datetime('now','utc') WHERE entry_id = ?`,
-          params: [entry_id],
-        },
-        {
-          sql: `UPDATE ledgers SET balance = ?, updated_at = datetime('now','utc') WHERE ledger_id = ?`,
-          params: [newBalance, entry.ledger_id],
-        },
+      const ops: DBOperation[] = [
+        buildOps.softDeleteEntry(entry_id),
+        buildOps.updateLedgerBalance(entry.ledger_id, newBalance),
       ];
 
       const deletedIds = new Set([entry_id]);
@@ -398,14 +354,8 @@ export const useEntryStore = create<EntryState & EntryActions>((set, get) => ({
               paired.amount,
               paired.cat_direction,
             );
-            ops.push({
-              sql: `UPDATE entries SET status = 0, updated_at = datetime('now','utc') WHERE entry_id = ?`,
-              params: [paired.entry_id],
-            });
-            ops.push({
-              sql: `UPDATE ledgers SET balance = ?, updated_at = datetime('now','utc') WHERE ledger_id = ?`,
-              params: [pairedBalance, paired.ledger_id],
-            });
+            ops.push(buildOps.softDeleteEntry(paired.entry_id));
+            ops.push(buildOps.updateLedgerBalance(paired.ledger_id, pairedBalance));
             deletedIds.add(paired.entry_id);
             balanceUpdates.push({ ledger_id: paired.ledger_id, balance: pairedBalance });
           }
@@ -675,42 +625,26 @@ export const useEntryStore = create<EntryState & EntryActions>((set, get) => ({
 
     try {
       await db.transaction([
-        {
-          sql: `INSERT INTO entries
-                  (entry_id, ledger_id, book_id, entry_date, detail, amount, cat_direction, transfer_group_id, status)
-                VALUES (?, ?, ?, ?, ?, ?, 'sub', ?, 1)`,
-          params: [
-            sourceEntryId,
-            sourceLedger.ledger_id,
-            book_id,
-            entry_date,
-            detail ?? null,
-            amount,
-            transfer_group_id,
-          ],
-        },
-        {
-          sql: `INSERT INTO entries
-                  (entry_id, ledger_id, book_id, entry_date, detail, amount, cat_direction, transfer_group_id, status)
-                VALUES (?, ?, ?, ?, ?, ?, 'add', ?, 1)`,
-          params: [
-            targetEntryId,
-            targetLedger.ledger_id,
-            book_id,
-            entry_date,
-            detail ?? null,
-            amount,
-            transfer_group_id,
-          ],
-        },
-        {
-          sql: `UPDATE ledgers SET balance = ?, updated_at = datetime('now','utc') WHERE ledger_id = ?`,
-          params: [newSourceBalance, sourceLedger.ledger_id],
-        },
-        {
-          sql: `UPDATE ledgers SET balance = ?, updated_at = datetime('now','utc') WHERE ledger_id = ?`,
-          params: [newTargetBalance, targetLedger.ledger_id],
-        },
+        buildOps.insertEntry(sourceEntryId, {
+          ledger_id: sourceLedger.ledger_id,
+          book_id,
+          entry_date,
+          detail: detail ?? null,
+          amount,
+          cat_direction: 'sub',
+          transfer_group_id,
+        }),
+        buildOps.insertEntry(targetEntryId, {
+          ledger_id: targetLedger.ledger_id,
+          book_id,
+          entry_date,
+          detail: detail ?? null,
+          amount,
+          cat_direction: 'add',
+          transfer_group_id,
+        }),
+        buildOps.updateLedgerBalance(sourceLedger.ledger_id, newSourceBalance),
+        buildOps.updateLedgerBalance(targetLedger.ledger_id, newTargetBalance),
       ]);
 
       const [srcEntry, tgtEntry] = await Promise.all([

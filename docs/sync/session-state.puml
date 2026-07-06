@@ -1,0 +1,44 @@
+@startuml session-state
+title P2P Sync — Session Lifecycle (per peer)
+
+skinparam shadowing false
+
+[*] --> Idle
+
+Idle --> Connecting : user taps "Sync now"\n(dial last_address)
+Connecting --> Authenticating : socket open\n(hello / challenge / auth / auth_ok)
+Authenticating --> Pulling : auth_ok verified\nsession keys derived
+
+Pulling --> ApplyingPull : changes_done received
+ApplyingPull --> Pushing : all batches applied\n+ cursor persisted\n+ apply_ack sent
+Pushing --> Complete : peer's apply_ack received\nsync_complete sent
+
+Complete --> Idle : update last_synced_at\nemit "Pulled X, pushed Y,\nN conflicts resolved"
+
+Connecting --> Failed : timeout / refused\n(host offline or address stale)
+Authenticating --> Failed : bad MAC / unknown_peer\n/ protocol_version
+Pulling --> Failed : disconnect
+ApplyingPull --> Failed : disconnect / apply error\n(transaction rolls back)
+Pushing --> Failed : disconnect
+
+Failed --> Idle : surface error to Sync screen
+
+note right of ApplyingPull
+  The ONLY state that moves the cursor —
+  and only in the same transaction as the
+  final applied batch. Every other exit
+  leaves cursors untouched, so any re-entry
+  re-requests the same delta and re-applies
+  idempotently. Crash-safe at every arrow.
+end note
+
+note bottom of Pushing
+  Push mirrors Pull with roles swapped:
+  the peer walks its own
+  Pulling -> ApplyingPull path.
+  A drop here means data flowed one way;
+  cursors record exactly that, and the
+  next session completes the other side.
+end note
+
+@enduml

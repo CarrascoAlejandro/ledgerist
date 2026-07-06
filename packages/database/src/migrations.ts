@@ -1,7 +1,19 @@
 import type { IDBConnection } from './connection.js';
-import { INIT_SQL } from './migrations/init.js';
+import { migration001Init } from './migrations/001_init.js';
+import { migration002Sync } from './migrations/002_sync.js';
+import { initSyncContext } from './syncContextInit.js';
 
-export async function runMigrations(conn: IDBConnection): Promise<void> {
+export interface Migration {
+  id: string;
+  up(conn: IDBConnection): Promise<void>;
+}
+
+export const MIGRATIONS: Migration[] = [migration001Init, migration002Sync];
+
+export async function runMigrations(
+  conn: IDBConnection,
+  migrations: Migration[] = MIGRATIONS,
+): Promise<void> {
   // Create migrations tracking table
   await conn.run(`
     CREATE TABLE IF NOT EXISTS _migrations (
@@ -10,28 +22,20 @@ export async function runMigrations(conn: IDBConnection): Promise<void> {
     )
   `);
 
-  // Check if init migration has been applied
-  const rows = await conn.query<{ id: string }>(
-    `SELECT id FROM _migrations WHERE id = ?`,
-    ['001_init'],
-  );
+  for (const migration of migrations) {
+    const rows = await conn.query<{ id: string }>(
+      `SELECT id FROM _migrations WHERE id = ?`,
+      [migration.id],
+    );
+    if (rows.length > 0) continue; // Already applied
 
-  if (rows.length > 0) {
-    return; // Already applied
+    await migration.up(conn);
+    await conn.run(`INSERT OR IGNORE INTO _migrations (id) VALUES (?)`, [migration.id]);
   }
 
-  // Split INIT_SQL on semicolons and run as transaction
-  const statements = INIT_SQL
-    .split(';')
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0);
-
-  const ops = statements.map((sql) => ({ sql }));
-  await conn.transaction(ops);
-
-  // Record migration
-  await conn.run(
-    `INSERT OR IGNORE INTO _migrations (id) VALUES (?)`,
-    ['001_init'],
-  );
+  // Seed the process-wide sync context once the schema is current. Skipped
+  // when running a partial list that stops before 002_sync (upgrade tests).
+  if (migrations.some((m) => m.id === migration002Sync.id)) {
+    await initSyncContext(conn);
+  }
 }

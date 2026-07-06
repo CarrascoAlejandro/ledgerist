@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { createQueries } from '@ledger/database';
+import { buildOps, createQueries } from '@ledger/database';
 import { validateLedgerName } from '@ledger/shared';
 import type { Ledger, ActionResult } from '@ledger/shared';
 import { getDB } from './db.js';
@@ -263,15 +263,9 @@ export const useLedgerStore = create<LedgerState & LedgerActions>((set, get) => 
     try {
       const db = getDB();
       await db.transaction([
-        {
-          sql: `UPDATE entries SET status = 0, updated_at = datetime('now','utc') WHERE ledger_id = ?`,
-          params: [ledger_id],
-        },
-        {
-          sql: `UPDATE ledgers SET status = 0, updated_at = datetime('now','utc') WHERE ledger_id = ?`,
-          params: [ledger_id],
-        },
-      ]); // TODO: SQL should be in queries file, not here
+        buildOps.softDeleteEntriesByLedger(ledger_id),
+        buildOps.softDeleteLedger(ledger_id),
+      ]);
       set((state) => ({
         ledgers: state.ledgers.filter((l) => l.ledger_id !== ledger_id),
       }));

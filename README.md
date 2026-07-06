@@ -292,3 +292,13 @@ transfer <amount> #<source> to #<target>
 | Mobile (Android) | Native SQLite file (`ledgerSQLite.db`) via `@capacitor-community/sqlite`, stored in the app's private databases directory |
 
 No data is ever sent to any server.
+
+---
+
+## Device Sync (planned)
+
+Phase 6 adds peer-to-peer sync between a user's devices over the local
+network — no central server ever holds the data. Devices pair via QR code,
+exchange deltas over an encrypted WebSocket channel, and merge with row-level
+last-write-wins on hybrid logical clocks. See the full design and behavior
+diagrams in [`docs/sync/DESIGN.md`](docs/sync/DESIGN.md).

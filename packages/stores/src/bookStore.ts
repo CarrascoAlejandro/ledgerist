@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import { createQueries } from '@ledger/database';
+import { buildOps, createQueries } from '@ledger/database';
+import type { DBOperation } from '@ledger/database';
 import { validateBookName } from '@ledger/shared';
 import type { Book, ActionResult } from '@ledger/shared';
 import { getDB } from './db.js';
@@ -191,19 +192,10 @@ export const useBookStore = create<BookState & BookActions>((set, get) => ({
     try {
       const db = getDB();
       await db.transaction([
-        {
-          sql: `UPDATE entries SET status = 0, updated_at = datetime('now','utc') WHERE book_id = ?`,
-          params: [book_id],
-        },
-        {
-          sql: `UPDATE ledgers SET status = 0, updated_at = datetime('now','utc') WHERE book_id = ?`,
-          params: [book_id],
-        },
-        {
-          sql: `UPDATE books SET status = 0, updated_at = datetime('now','utc') WHERE book_id = ?`,
-          params: [book_id],
-        },
-      ]); // TODO: SQL should be in queries file, not here
+        buildOps.softDeleteEntriesByBook(book_id),
+        buildOps.softDeleteLedgersByBook(book_id),
+        buildOps.softDeleteBook(book_id),
+      ]);
       set((state) => ({
         books: state.books.filter((b) => b.book_id !== book_id),
         currentBook:
@@ -282,26 +274,25 @@ export const useBookStore = create<BookState & BookActions>((set, get) => ({
         }));
 
       const today = new Date().toISOString().slice(0, 10);
-      const ops: Array<{ sql: string; params?: unknown[] }> = [];
+      const ops: DBOperation[] = [];
 
       for (const adj of adjustments) {
         const entry_id = crypto.randomUUID();
-        ops.push({
-          sql: `INSERT INTO entries
-                  (entry_id, ledger_id, book_id, entry_date, detail, amount, cat_direction, transfer_group_id, status)
-                VALUES (?, ?, ?, ?, 'Balance adjustment', ?, ?, NULL, 1)`,
-          params: [entry_id, adj.ledger_id, book_id, today, adj.amount, adj.direction],
-        });
-        ops.push({
-          sql: `UPDATE ledgers SET balance = 0, updated_at = datetime('now','utc') WHERE ledger_id = ?`,
-          params: [adj.ledger_id],
-        });
+        ops.push(
+          buildOps.insertEntry(entry_id, {
+            ledger_id: adj.ledger_id,
+            book_id,
+            entry_date: today,
+            detail: 'Balance adjustment',
+            amount: adj.amount,
+            cat_direction: adj.direction,
+            transfer_group_id: null,
+          }),
+        );
+        ops.push(buildOps.updateLedgerBalance(adj.ledger_id, 0));
       }
 
-      ops.push({
-        sql: `UPDATE books SET is_balanced = 1, is_closed = 1, updated_at = datetime('now','utc') WHERE book_id = ?`,
-        params: [book_id],
-      });
+      ops.push(buildOps.setBookBalancedAndClosed(book_id));
 
       await db.transaction(ops);
 

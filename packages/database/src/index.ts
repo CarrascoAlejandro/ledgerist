@@ -1,9 +1,12 @@
-export type { IDBConnection, DBConnectionOptions, DBConnectionFactory } from './connection.js';
-export { runMigrations } from './migrations.js';
+export type { IDBConnection, DBConnectionOptions, DBConnectionFactory, DBOperation } from './connection.js';
+export { runMigrations, MIGRATIONS } from './migrations.js';
+export type { Migration } from './migrations.js';
 export { WebDBConnection } from './drivers/web.js';
 export { ElectronRendererConnection } from './drivers/electron-renderer.js';
-export { createQueries } from './queries.js';
-export type { Queries } from './queries.js';
+export { createQueries, buildOps } from './queries.js';
+export type { Queries, EntryData, EntryUpdateFields } from './queries.js';
+export { syncStamp, STAMP_SET, STAMP_COLS, STAMP_VALS } from './syncStamp.js';
+export { initSyncContext } from './syncContextInit.js';
 
 // Lazy-load createWebConnection so that import.meta.url in create-web.ts
 // is never parsed at module load time (required for Jest compatibility).

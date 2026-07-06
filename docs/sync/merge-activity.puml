@@ -1,0 +1,84 @@
+@startuml merge-activity
+title P2P Sync — Merge Pipeline (per table batch, one transaction)
+
+skinparam shadowing false
+
+start
+
+:receive changes batch\n(books | ledgers | entries);
+
+partition "Per incoming row" {
+  :hlc.receive(row.version_hlc)\n(advance local clock past everything seen);
+
+  if (row exists locally by PK?) then (no)
+    if (incoming unique value taken by a DIFFERENT local row?) then (yes)
+      :resolve UNIQUE collision:
+      loser = lower version_hlc;
+      if (incoming row loses) then (yes)
+        :books.name -> rename with device suffix
+        ledger alias -> set NULL
+        (applied to incoming row before insert);
+      else (local row loses)
+        :rename / NULL-out the LOCAL row
+        as a fresh stamped local edit
+        (propagates and converges);
+      endif
+      :record sync_conflicts\n(unique_name | unique_alias);
+    endif
+    :INSERT row verbatim\n(keep remote version_hlc + origin_device_id\n— never re-stamp);
+  else (yes)
+    if (remote.version_hlc > local.version_hlc?) then (yes)
+      if (content differs AND origins differ?) then (yes)
+        :record sync_conflicts\n(kind=lww, winner=remote,\nloser_snapshot = local row JSON);
+      endif
+      :full-row UPDATE with remote values\n(keep remote version fields);
+      note right
+        status is an ordinary column:
+        delete-vs-edit resolves by the
+        same LWW rule (tombstone wins
+        or loses on version_hlc alone)
+      end note
+    else (no — local newer or equal)
+      if (content differs AND origins differ?) then (yes)
+        :record sync_conflicts\n(kind=lww, winner=local);
+      endif
+      :skip row (no-op\n=> re-delivery is idempotent);
+    endif
+  endif
+
+  note right
+    Applies use plain INSERT/UPDATE so the
+    change-log triggers fire: this device's log
+    registers the row at a fresh seq, and other
+    peers pick it up from here -> transitivity.
+  end note
+}
+
+partition "Post-pass A — transfer repair (after entries batch)" {
+  :for each transfer_group_id touched by the batch;
+  if (both pair entries exist locally\nAND disagree on status or amount?) then (yes)
+    :copy field(s) from higher-HLC entry to its pair\nas a fresh stamped local edit;
+    :record sync_conflicts (transfer_repair);
+  else (no)
+    :nothing — UI tolerates a missing pair;
+  endif
+}
+
+partition "Post-pass B — balance recompute" {
+  :for every ledger_id referenced by the batch:
+  UPDATE ledgers SET balance =
+    SUM(add: +amount / sub: -amount)
+    over entries WHERE status = 1;
+  note right
+    balance never travels on the wire and
+    this UPDATE does NOT stamp version_hlc
+    (derived, device-local state)
+  end note
+}
+
+:commit transaction;
+:persist cursor if this was the final batch\n(same transaction);
+
+stop
+
+@enduml

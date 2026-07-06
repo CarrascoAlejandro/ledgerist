@@ -1,0 +1,122 @@
+@startuml schema
+title P2P Sync — Metadata Schema (migration 002_sync)
+
+skinparam shadowing false
+hide circle
+skinparam linetype ortho
+
+entity "books" as books {
+  * book_id : TEXT <<PK>>
+  --
+  name : TEXT <<UNIQUE>>
+  ... existing columns ...
+  --
+  <b>version_hlc : TEXT</b> <<new>>
+  <b>origin_device_id : TEXT</b> <<new>>
+}
+
+entity "ledgers" as ledgers {
+  * ledger_id : TEXT <<PK>>
+  --
+  book_id : TEXT <<FK>>
+  alias : TEXT <<UNIQUE(book_id, alias)>>
+  balance : NUMERIC <<derived — never synced>>
+  ... existing columns ...
+  --
+  <b>version_hlc : TEXT</b> <<new>>
+  <b>origin_device_id : TEXT</b> <<new>>
+}
+
+entity "entries" as entries {
+  * entry_id : TEXT <<PK>>
+  --
+  ledger_id : TEXT <<FK>>
+  book_id : TEXT <<FK>>
+  transfer_group_id : TEXT
+  status : INTEGER <<0 = tombstone>>
+  ... existing columns ...
+  --
+  <b>version_hlc : TEXT</b> <<new>>
+  <b>origin_device_id : TEXT</b> <<new>>
+}
+
+entity "sync_local" as slocal {
+  * id : INTEGER = 1 <<single row>>
+  --
+  device_id : TEXT
+  device_name : TEXT
+  created_at : TEXT
+}
+
+entity "sync_peers" as speers {
+  * peer_device_id : TEXT <<PK>>
+  --
+  peer_name : TEXT
+  shared_key : TEXT <<base64 32B, from HKDF at pairing>>
+  last_address : TEXT <<"host:port" hint>>
+  applied_through_seq : INTEGER <<cursor into THAT PEER's log>>
+  last_synced_at : TEXT
+  paired_at : TEXT
+  status : INTEGER <<0 = unpaired>>
+}
+
+entity "sync_change_log" as slog {
+  * seq : INTEGER <<PK AUTOINCREMENT>>
+  --
+  table_name : TEXT
+  row_id : TEXT
+  <<UNIQUE(table_name, row_id)>>
+}
+
+entity "sync_conflicts" as sconf {
+  * conflict_id : TEXT <<PK>>
+  --
+  kind : lww | unique_name | unique_alias | transfer_repair
+  table_name : TEXT
+  row_id : TEXT
+  peer_device_id : TEXT
+  winner : local | remote
+  loser_snapshot : TEXT <<JSON of losing row>>
+  resolved_at : TEXT
+  seen : INTEGER
+}
+
+books ||--o{ ledgers
+books ||--o{ entries
+ledgers ||--o{ entries
+
+books ..> slog : AFTER INSERT/UPDATE trigger
+ledgers ..> slog : AFTER INSERT/UPDATE trigger
+entries ..> slog : AFTER INSERT/UPDATE trigger
+sconf ..> speers : peer_device_id
+
+note bottom of slog
+  Compacted dirty-set: one row per ever-changed domain row.
+  Trigger body: DELETE old (table,row) entry, INSERT fresh one.
+  AUTOINCREMENT => seq only ever moves UP, which makes
+  table-ordered delta batches FK-safe (section 5.3).
+  Seeded with all existing rows at migration =>
+  a peer at cursor 0 receives a full snapshot as an ordinary delta.
+end note
+
+note bottom of sconf
+  Written by the merge pipeline whenever a
+  concurrent change loses LWW or a UNIQUE
+  collision is auto-resolved. Backs the
+  read-only conflict log UI.
+end note
+
+note right of slocal
+  version_hlc format (lexicographically sortable):
+  <15-digit ms>-<4-hex counter>-<8-char device id>
+  e.g. 001751803254123-0003-3f9a12bc
+  Stamped by app code (syncStamp helper);
+  triggers cannot generate clocks.
+end note
+
+note left of speers
+  app_settings is NOT synced (per-device)
+  and carries no sync columns.
+end note
+
+@enduml

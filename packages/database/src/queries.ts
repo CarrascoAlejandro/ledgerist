@@ -1,5 +1,131 @@
-import type { IDBConnection } from './connection.js';
+import type { DBOperation, IDBConnection } from './connection.js';
 import type { Book, Ledger, Entry, AppSettings, EntryDirection } from '@ledger/shared';
+import { STAMP_COLS, STAMP_SET, STAMP_VALS, syncStamp } from './syncStamp.js';
+
+export interface EntryData {
+  ledger_id: string;
+  book_id: string;
+  entry_date: string;
+  detail: string | null;
+  amount: number;
+  cat_direction: EntryDirection;
+  transfer_group_id: string | null;
+}
+
+export interface EntryUpdateFields {
+  entry_date?: string;
+  detail?: string | null;
+  amount?: number;
+  cat_direction?: EntryDirection;
+}
+
+// Single source of truth for mutation statements that stores compose into
+// transactions. Stamps are computed when the op is built, immediately before
+// the transaction runs. updateLedgerBalance is deliberately unstamped:
+// balance is derived, device-local state (docs/sync/DESIGN.md §2.3).
+export const buildOps = {
+  insertEntry(entry_id: string, data: EntryData): DBOperation {
+    return {
+      sql: `INSERT INTO entries
+              (entry_id, ledger_id, book_id, entry_date, detail, amount, cat_direction, transfer_group_id, status${STAMP_COLS})
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1${STAMP_VALS})`,
+      params: [
+        entry_id,
+        data.ledger_id,
+        data.book_id,
+        data.entry_date,
+        data.detail,
+        data.amount,
+        data.cat_direction,
+        data.transfer_group_id,
+        ...syncStamp(),
+      ],
+    };
+  },
+
+  updateEntryFields(entry_id: string, fields: EntryUpdateFields): DBOperation | null {
+    const parts: string[] = [];
+    const params: unknown[] = [];
+    if (fields.entry_date !== undefined) {
+      parts.push('entry_date = ?');
+      params.push(fields.entry_date);
+    }
+    if (fields.detail !== undefined) {
+      parts.push('detail = ?');
+      params.push(fields.detail);
+    }
+    if (fields.amount !== undefined) {
+      parts.push('amount = ?');
+      params.push(fields.amount);
+    }
+    if (fields.cat_direction !== undefined) {
+      parts.push('cat_direction = ?');
+      params.push(fields.cat_direction);
+    }
+    if (parts.length === 0) return null;
+    parts.push(STAMP_SET);
+    params.push(...syncStamp());
+    parts.push("updated_at = datetime('now','utc')");
+    params.push(entry_id);
+    return { sql: `UPDATE entries SET ${parts.join(', ')} WHERE entry_id = ?`, params };
+  },
+
+  softDeleteEntry(entry_id: string): DBOperation {
+    return {
+      sql: `UPDATE entries SET status = 0, ${STAMP_SET}, updated_at = datetime('now','utc') WHERE entry_id = ?`,
+      params: [...syncStamp(), entry_id],
+    };
+  },
+
+  softDeleteEntriesByLedger(ledger_id: string): DBOperation {
+    return {
+      sql: `UPDATE entries SET status = 0, ${STAMP_SET}, updated_at = datetime('now','utc') WHERE ledger_id = ?`,
+      params: [...syncStamp(), ledger_id],
+    };
+  },
+
+  softDeleteEntriesByBook(book_id: string): DBOperation {
+    return {
+      sql: `UPDATE entries SET status = 0, ${STAMP_SET}, updated_at = datetime('now','utc') WHERE book_id = ?`,
+      params: [...syncStamp(), book_id],
+    };
+  },
+
+  softDeleteLedger(ledger_id: string): DBOperation {
+    return {
+      sql: `UPDATE ledgers SET status = 0, ${STAMP_SET}, updated_at = datetime('now','utc') WHERE ledger_id = ?`,
+      params: [...syncStamp(), ledger_id],
+    };
+  },
+
+  softDeleteLedgersByBook(book_id: string): DBOperation {
+    return {
+      sql: `UPDATE ledgers SET status = 0, ${STAMP_SET}, updated_at = datetime('now','utc') WHERE book_id = ?`,
+      params: [...syncStamp(), book_id],
+    };
+  },
+
+  softDeleteBook(book_id: string): DBOperation {
+    return {
+      sql: `UPDATE books SET status = 0, ${STAMP_SET}, updated_at = datetime('now','utc') WHERE book_id = ?`,
+      params: [...syncStamp(), book_id],
+    };
+  },
+
+  setBookBalancedAndClosed(book_id: string): DBOperation {
+    return {
+      sql: `UPDATE books SET is_balanced = 1, is_closed = 1, ${STAMP_SET}, updated_at = datetime('now','utc') WHERE book_id = ?`,
+      params: [...syncStamp(), book_id],
+    };
+  },
+
+  updateLedgerBalance(ledger_id: string, balance: number): DBOperation {
+    return {
+      sql: `UPDATE ledgers SET balance = ?, updated_at = datetime('now','utc') WHERE ledger_id = ?`,
+      params: [balance, ledger_id],
+    };
+  },
+};
 
 export function createQueries(db: IDBConnection) {
   return {
@@ -34,45 +160,43 @@ export function createQueries(db: IDBConnection) {
       // eslint-disable-next-line no-console
       console.info('[db] insertBook', { book_id, name, nameType: typeof name });
       await db.run(
-        `INSERT INTO books (book_id, name, is_closed, is_balanced, is_auto_open, status)
-         VALUES (?, ?, 0, 0, 0, 1)`,
-        [book_id, name],
+        `INSERT INTO books (book_id, name, is_closed, is_balanced, is_auto_open, status${STAMP_COLS})
+         VALUES (?, ?, 0, 0, 0, 1${STAMP_VALS})`,
+        [book_id, name, ...syncStamp()],
       );
     },
 
     async updateBookName(book_id: string, name: string): Promise<void> {
       await db.run(
-        `UPDATE books SET name = ?, updated_at = datetime('now','utc') WHERE book_id = ?`,
-        [name, book_id],
+        `UPDATE books SET name = ?, ${STAMP_SET}, updated_at = datetime('now','utc') WHERE book_id = ?`,
+        [name, ...syncStamp(), book_id],
       );
     },
 
     async setBookClosed(book_id: string, is_closed: 0 | 1): Promise<void> {
       await db.run(
-        `UPDATE books SET is_closed = ?, updated_at = datetime('now','utc') WHERE book_id = ?`,
-        [is_closed, book_id],
+        `UPDATE books SET is_closed = ?, ${STAMP_SET}, updated_at = datetime('now','utc') WHERE book_id = ?`,
+        [is_closed, ...syncStamp(), book_id],
       );
     },
 
     async setBookAutoOpen(book_id: string, is_auto_open: 0 | 1): Promise<void> {
       await db.run(
-        `UPDATE books SET is_auto_open = ?, updated_at = datetime('now','utc') WHERE book_id = ?`,
-        [is_auto_open, book_id],
+        `UPDATE books SET is_auto_open = ?, ${STAMP_SET}, updated_at = datetime('now','utc') WHERE book_id = ?`,
+        [is_auto_open, ...syncStamp(), book_id],
       );
     },
 
     async setBookBalanced(book_id: string, is_balanced: 0 | 1): Promise<void> {
       await db.run(
-        `UPDATE books SET is_balanced = ?, updated_at = datetime('now','utc') WHERE book_id = ?`,
-        [is_balanced, book_id],
+        `UPDATE books SET is_balanced = ?, ${STAMP_SET}, updated_at = datetime('now','utc') WHERE book_id = ?`,
+        [is_balanced, ...syncStamp(), book_id],
       );
     },
 
     async softDeleteBook(book_id: string): Promise<void> {
-      await db.run(
-        `UPDATE books SET status = 0, updated_at = datetime('now','utc') WHERE book_id = ?`,
-        [book_id],
-      );
+      const op = buildOps.softDeleteBook(book_id);
+      await db.run(op.sql, op.params);
     },
 
     // ── Ledgers ────────────────────────────────────────────────────────────
@@ -107,59 +231,53 @@ export function createQueries(db: IDBConnection) {
       icon: string,
     ): Promise<void> {
       await db.run(
-        `INSERT INTO ledgers (ledger_id, book_id, ledger_name, icon, balance, status)
-         VALUES (?, ?, ?, ?, 0, 1)`,
-        [ledger_id, book_id, ledger_name, icon],
+        `INSERT INTO ledgers (ledger_id, book_id, ledger_name, icon, balance, status${STAMP_COLS})
+         VALUES (?, ?, ?, ?, 0, 1${STAMP_VALS})`,
+        [ledger_id, book_id, ledger_name, icon, ...syncStamp()],
       );
     },
 
     async updateLedgerName(ledger_id: string, name: string): Promise<void> {
       await db.run(
-        `UPDATE ledgers SET ledger_name = ?, updated_at = datetime('now','utc') WHERE ledger_id = ?`,
-        [name, ledger_id],
+        `UPDATE ledgers SET ledger_name = ?, ${STAMP_SET}, updated_at = datetime('now','utc') WHERE ledger_id = ?`,
+        [name, ...syncStamp(), ledger_id],
       );
     },
 
     async updateLedgerBalance(ledger_id: string, balance: number): Promise<void> {
-      await db.run(
-        `UPDATE ledgers SET balance = ?, updated_at = datetime('now','utc') WHERE ledger_id = ?`,
-        [balance, ledger_id],
-      );
+      const op = buildOps.updateLedgerBalance(ledger_id, balance);
+      await db.run(op.sql, op.params);
     },
 
     async updateLedgerColor(ledger_id: string, color: string | null): Promise<void> {
       await db.run(
-        `UPDATE ledgers SET ledger_color = ?, updated_at = datetime('now','utc') WHERE ledger_id = ?`,
-        [color, ledger_id],
+        `UPDATE ledgers SET ledger_color = ?, ${STAMP_SET}, updated_at = datetime('now','utc') WHERE ledger_id = ?`,
+        [color, ...syncStamp(), ledger_id],
       );
     },
 
     async updateLedgerIcon(ledger_id: string, icon: string): Promise<void> {
       await db.run(
-        `UPDATE ledgers SET icon = ?, updated_at = datetime('now','utc') WHERE ledger_id = ?`,
-        [icon, ledger_id],
+        `UPDATE ledgers SET icon = ?, ${STAMP_SET}, updated_at = datetime('now','utc') WHERE ledger_id = ?`,
+        [icon, ...syncStamp(), ledger_id],
       );
     },
 
     async updateLedgerAlias(ledger_id: string, alias: string | null): Promise<void> {
       await db.run(
-        `UPDATE ledgers SET alias = ?, updated_at = datetime('now','utc') WHERE ledger_id = ?`,
-        [alias, ledger_id],
+        `UPDATE ledgers SET alias = ?, ${STAMP_SET}, updated_at = datetime('now','utc') WHERE ledger_id = ?`,
+        [alias, ...syncStamp(), ledger_id],
       );
     },
 
     async softDeleteLedger(ledger_id: string): Promise<void> {
-      await db.run(
-        `UPDATE ledgers SET status = 0, updated_at = datetime('now','utc') WHERE ledger_id = ?`,
-        [ledger_id],
-      );
+      const op = buildOps.softDeleteLedger(ledger_id);
+      await db.run(op.sql, op.params);
     },
 
     async softDeleteLedgersByBook(book_id: string): Promise<void> {
-      await db.run(
-        `UPDATE ledgers SET status = 0, updated_at = datetime('now','utc') WHERE book_id = ?`,
-        [book_id],
-      );
+      const op = buildOps.softDeleteLedgersByBook(book_id);
+      await db.run(op.sql, op.params);
     },
 
     // ── Entries ────────────────────────────────────────────────────────────
@@ -207,87 +325,30 @@ export function createQueries(db: IDBConnection) {
       );
     },
 
-    async insertEntry(
-      entry_id: string,
-      data: {
-        ledger_id: string;
-        book_id: string;
-        entry_date: string;
-        detail: string | null;
-        amount: number;
-        cat_direction: EntryDirection;
-        transfer_group_id: string | null;
-      },
-    ): Promise<void> {
-      await db.run(
-        `INSERT INTO entries
-           (entry_id, ledger_id, book_id, entry_date, detail, amount, cat_direction, transfer_group_id, status)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)`,
-        [
-          entry_id,
-          data.ledger_id,
-          data.book_id,
-          data.entry_date,
-          data.detail,
-          data.amount,
-          data.cat_direction,
-          data.transfer_group_id,
-        ],
-      );
+    async insertEntry(entry_id: string, data: EntryData): Promise<void> {
+      const op = buildOps.insertEntry(entry_id, data);
+      await db.run(op.sql, op.params);
     },
 
-    async updateEntryFields(
-      entry_id: string,
-      fields: {
-        entry_date?: string;
-        detail?: string | null;
-        amount?: number;
-        cat_direction?: EntryDirection;
-      },
-    ): Promise<void> {
-      const parts: string[] = [];
-      const params: unknown[] = [];
-      if (fields.entry_date !== undefined) {
-        parts.push('entry_date = ?');
-        params.push(fields.entry_date);
-      }
-      if (fields.detail !== undefined) {
-        parts.push('detail = ?');
-        params.push(fields.detail);
-      }
-      if (fields.amount !== undefined) {
-        parts.push('amount = ?');
-        params.push(fields.amount);
-      }
-      if (fields.cat_direction !== undefined) {
-        parts.push('cat_direction = ?');
-        params.push(fields.cat_direction);
-      }
-      if (parts.length === 0) return;
-      parts.push("updated_at = datetime('now','utc')");
-      params.push(entry_id);
-      await db.run(`UPDATE entries SET ${parts.join(', ')} WHERE entry_id = ?`, params);
+    async updateEntryFields(entry_id: string, fields: EntryUpdateFields): Promise<void> {
+      const op = buildOps.updateEntryFields(entry_id, fields);
+      if (!op) return;
+      await db.run(op.sql, op.params);
     },
 
     async softDeleteEntry(entry_id: string): Promise<void> {
-      await db.run(
-        `UPDATE entries SET status = 0, updated_at = datetime('now','utc') WHERE entry_id = ?`,
-        [entry_id],
-      );
+      const op = buildOps.softDeleteEntry(entry_id);
+      await db.run(op.sql, op.params);
     },
 
     async softDeleteEntriesByLedger(ledger_id: string): Promise<void> {
-      await db.run(
-        `UPDATE entries SET status = 0, updated_at = datetime('now','utc') WHERE ledger_id = ?`,
-        [ledger_id],
-      );
+      const op = buildOps.softDeleteEntriesByLedger(ledger_id);
+      await db.run(op.sql, op.params);
     },
 
     async softDeleteEntriesByBook(book_id: string): Promise<void> {
-      await db.run(
-        `UPDATE entries SET status = 0, updated_at = datetime('now','utc') WHERE book_id = ?`,
-        [book_id],
-      );
+      const op = buildOps.softDeleteEntriesByBook(book_id);
+      await db.run(op.sql, op.params);
     },
 
     // ── Settings ───────────────────────────────────────────────────────────

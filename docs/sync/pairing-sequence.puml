@@ -1,0 +1,51 @@
+@startuml pairing-sequence
+title P2P Sync — First-Time Pairing
+
+skinparam shadowing false
+
+actor User
+participant "Host\n(Electron desktop)" as H
+participant "Joiner\n(mobile / browser / desktop)" as J
+
+User -> H : Sync screen -> "Pair new device"
+H -> H : generate 32-byte pairing_secret\nstart 2-minute expiry timer
+H -> User : show QR + copyable string\nledger-sync://pair?v=1&host=...&port=...\n&device=<host_id>&secret=<base64url>
+
+User -> J : scan QR (Capacitor scanner)\nor paste string
+J -> H : open ws://host:port
+
+J -> H : pair_request { device_id, device_name,\n proof = HMAC(secret, "pair-v1" || joiner_id || host_id) }
+
+alt proof valid and offer not expired
+  H -> H : verify proof
+  H -> J : pair_accept { device_id, device_name,\n proof = HMAC(secret, "pair-v1" || host_id || joiner_id) }
+  J -> J : verify host proof\n(mutual authentication)
+
+  note over H, J
+    Both derive the long-lived pairing key:
+    K = HKDF-SHA256(secret, salt="ledger-sync-v1",
+                    info=sort(device_id_a, device_id_b))
+  end note
+
+  H -> H : INSERT sync_peers\n(peer=joiner, shared_key=K,\n last_address=NULL, cursor=0)
+  J -> J : INSERT sync_peers\n(peer=host, shared_key=K,\n last_address=host:port, cursor=0)
+  H -> H : invalidate pairing offer\n(one successful use)
+  H --> User : "Device paired"
+  J --> User : "Device paired"
+
+else proof invalid
+  H -> J : error { pairing_failed }
+  H -> H : keep offer active,\ncount failures (rate-limit)
+
+else offer expired
+  H -> J : error { pairing_expired }
+  J --> User : "Ask the host to show a new code"
+end
+
+note over H, J
+  The full 32-byte secret rides in the QR code,
+  so no PAKE is needed. No short numeric code in v1:
+  without PAKE it would be brute-forceable.
+end note
+
+@enduml

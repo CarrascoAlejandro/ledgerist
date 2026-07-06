@@ -1,0 +1,65 @@
+@startuml session-sequence
+title P2P Sync — Full Sync Session ("Sync now")
+
+skinparam shadowing false
+
+participant "Client C\n(dialing device)" as C
+participant "Server S\n(listening device)" as S
+
+== Authentication (plaintext messages) ==
+
+C -> S : hello { v: 1, device_id, nonce_c }
+alt peer known
+  S -> C : challenge { device_id, nonce_s }
+else peer unknown / unpaired
+  S -> C : error { unknown_peer }
+  note right : UI prompts to re-pair
+end
+C -> S : auth { mac = HMAC(K, "auth-c" || nonce_c || nonce_s) }
+S -> C : auth_ok { mac = HMAC(K, "auth-s" || nonce_s || nonce_c) }
+
+note over C, S
+  Both derive session keys: HKDF(K, nonce_c || nonce_s)
+  -> one AES-256-GCM key per direction, counter nonces.
+  Every following frame: [8B counter | GCM ciphertext].
+  Fresh nonces kill cross-session replay; strictly
+  increasing counters kill in-session replay.
+end note
+
+== Pull phase (C pulls from S) ==
+
+C -> S : sync_begin { cursor = applied_through_seq[S] }
+S -> S : snapshot = MAX(seq) of own change log\ncollect rows with cursor < seq <= snapshot
+S -> C : changes { table: 'books', rows: [...] }
+S -> C : changes { table: 'ledgers', rows: [...] }
+S -> C : changes { table: 'entries', rows: [...] }
+note right of S : batches of <= 500 rows,\nstrictly books -> ledgers -> entries\n(ledger rows travel without balance)
+S -> C : changes_done { through_seq = snapshot }
+C -> C : apply batches (merge pipeline, section 6)\npersist cursor = through_seq\nin the SAME transaction as the final batch
+C -> S : apply_ack { through_seq }
+
+== Push phase (roles swap: S pulls from C) ==
+
+S -> C : sync_begin { cursor = applied_through_seq[C] }
+C -> S : changes { ... }
+C -> S : changes_done { through_seq }
+S -> S : apply + persist cursor
+S -> C : apply_ack { through_seq }
+
+C -> S : sync_complete
+C -> S : close
+
+== Disconnect / resume ==
+
+alt connection drops at ANY point
+  note over C, S
+    Nothing to undo. Cursors advanced only where a full
+    apply committed. Next session re-sends the same delta;
+    re-applying is idempotent (a row whose version_hlc is
+    not strictly greater than the local one is a no-op).
+    Writes made during the session sit above `snapshot`
+    and simply go out next time.
+  end note
+end
+
+@enduml
