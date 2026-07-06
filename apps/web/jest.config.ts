@@ -14,6 +14,7 @@ const config = {
     '^@ledger/shared$': '<rootDir>/../../packages/shared/src/index.ts',
     '^@ledger/database$': '<rootDir>/../../packages/database/src/index.ts',
     '^@ledger/stores$': '<rootDir>/../../packages/stores/src/index.ts',
+    '^@ledger/sync$': '<rootDir>/../../packages/sync/src/index.ts',
   },
   transform: {
     '^.+\\.(ts|tsx)$': ['ts-jest', {

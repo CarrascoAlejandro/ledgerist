@@ -36,6 +36,7 @@
       "<rootDir>/packages/shared",
       "<rootDir>/packages/database",
       "<rootDir>/packages/stores",
+      "<rootDir>/packages/sync",
       "<rootDir>/apps/web"
     ]
   }

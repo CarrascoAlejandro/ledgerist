@@ -4,7 +4,8 @@
     "paths": {
       "@ledger/shared": ["../../packages/shared/src/index.ts"],
       "@ledger/database": ["../../packages/database/src/index.ts"],
-      "@ledger/stores": ["../../packages/stores/src/index.ts"]
+      "@ledger/stores": ["../../packages/stores/src/index.ts"],
+      "@ledger/sync": ["../../packages/sync/src/index.ts"]
     }
   },
   "include": ["src"],

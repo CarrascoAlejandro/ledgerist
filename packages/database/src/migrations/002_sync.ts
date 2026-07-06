@@ -51,6 +51,7 @@ export const migration002Sync: Migration = {
         \`shared_key\` TEXT NOT NULL,
         \`last_address\` TEXT,
         \`applied_through_seq\` INTEGER NOT NULL DEFAULT 0,
+        \`acked_through_seq\` INTEGER NOT NULL DEFAULT 0,
         \`last_synced_at\` TEXT,
         \`paired_at\` TEXT DEFAULT (datetime('now','utc')),
         \`status\` INTEGER DEFAULT 1 CHECK (\`status\` IN (0, 1))

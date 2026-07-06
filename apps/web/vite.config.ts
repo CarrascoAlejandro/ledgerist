@@ -17,6 +17,7 @@ export default defineConfig({
       '@ledger/shared': path.resolve(__dirname, '../../packages/shared/src/index.ts'),
       '@ledger/database': path.resolve(__dirname, '../../packages/database/src/index.ts'),
       '@ledger/stores': path.resolve(__dirname, '../../packages/stores/src/index.ts'),
+      '@ledger/sync': path.resolve(__dirname, '../../packages/sync/src/index.ts'),
     },
   },
   optimizeDeps: { include: ['sql.js', 'sql.js/dist/sql-wasm.js'] },
