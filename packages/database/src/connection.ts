@@ -9,6 +9,13 @@ export interface IDBConnection {
   transaction(ops: DBOperation[]): Promise<void>;
   isOpen(): boolean;
   close(): Promise<void>;
+  /**
+   * Optional bulk-write window: drivers with expensive per-write persistence
+   * (sql.js re-serializes the whole DB to IndexedDB on every write) may defer
+   * persisting until endBulk(). Nestable; no-ops elsewhere.
+   */
+  beginBulk?(): void;
+  endBulk?(): Promise<void>;
 }
 
 export interface DBConnectionOptions {

@@ -71,6 +71,8 @@ export class WebDBConnection implements IDBConnection {
   private dbName: string;
   private persist: boolean;
   private open: boolean;
+  private bulkDepth = 0;
+  private dirtyDuringBulk = false;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   constructor(db: any, dbName: string, persist: boolean) {
@@ -111,9 +113,7 @@ export class WebDBConnection implements IDBConnection {
     const changes =
       changesResult?.[0]?.values?.[0]?.[0] as number | undefined;
 
-    if (this.persist) {
-      await this.persistToDB();
-    }
+    await this.persistIfNeeded();
 
     return { lastID, changes };
   }
@@ -130,13 +130,27 @@ export class WebDBConnection implements IDBConnection {
       throw err;
     }
 
-    if (this.persist) {
-      await this.persistToDB();
-    }
+    await this.persistIfNeeded();
   }
 
   isOpen(): boolean {
     return this.open;
+  }
+
+  /** Defer whole-DB IndexedDB serialization while a bulk window is open. */
+  beginBulk(): void {
+    this.bulkDepth += 1;
+  }
+
+  async endBulk(): Promise<void> {
+    if (this.bulkDepth === 0) return;
+    this.bulkDepth -= 1;
+    if (this.bulkDepth === 0 && this.dirtyDuringBulk) {
+      this.dirtyDuringBulk = false;
+      if (this.persist) {
+        await this.persistToDB();
+      }
+    }
   }
 
   async close(): Promise<void> {
@@ -147,6 +161,15 @@ export class WebDBConnection implements IDBConnection {
       this.db.close();
       this.open = false;
     }
+  }
+
+  private async persistIfNeeded(): Promise<void> {
+    if (!this.persist) return;
+    if (this.bulkDepth > 0) {
+      this.dirtyDuringBulk = true;
+      return;
+    }
+    await this.persistToDB();
   }
 
   private async persistToDB(): Promise<void> {

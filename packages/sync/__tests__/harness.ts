@@ -184,14 +184,20 @@ export async function syncPair(
   };
 }
 
-/** All synced columns (incl. version fields), ordered by PK — balance excluded by construction. */
+/**
+ * All synced columns ordered by PK — balance excluded by construction and
+ * updated_at excluded by doctrine: it is display-only wall-clock metadata
+ * (balance-only updates bump it without bumping version_hlc, so it can
+ * legitimately differ across devices for identical synced content).
+ */
 export async function dumpTables(
   conn: IDBConnection,
 ): Promise<Record<string, unknown[]>> {
   const dump: Record<string, unknown[]> = {};
   for (const spec of SYNC_TABLES) {
+    const cols = spec.columns.filter((c) => c !== 'updated_at');
     dump[spec.table] = await conn.query(
-      `SELECT ${spec.columns.join(', ')} FROM ${spec.table} ORDER BY ${spec.pk}`,
+      `SELECT ${cols.join(', ')} FROM ${spec.table} ORDER BY ${spec.pk}`,
     );
   }
   return dump;

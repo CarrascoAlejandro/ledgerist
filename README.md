@@ -197,6 +197,19 @@ npm run build                                  # cap requires apps/web/dist to e
 cd apps/mobile && npx cap add android
 ```
 
+**Post-`cap add` step for Device Sync:** Android API 28+ blocks cleartext
+traffic, which includes the `ws://` LAN connections sync uses (payloads are
+app-layer AES-GCM encrypted regardless). After regenerating the native
+project, add this attribute to `<application>` in
+`android/app/src/main/AndroidManifest.xml`:
+
+```xml
+<application android:usesCleartextTraffic="true" ...>
+```
+
+(The WebView mixed-content side is already handled by
+`android.allowMixedContent` in `capacitor.config.ts`.)
+
 ### Run on a device or emulator
 
 From the repo root:
@@ -240,19 +253,15 @@ Run in watch mode:
 npm run test:watch
 ```
 
-There are currently **170 tests** across 11 suites:
+There are currently **297 tests** across 24 suites:
 
 | Suite | Package |
 |-------|---------|
-| types | `packages/shared` |
-| date utils | `packages/shared` |
-| math/validation utils | `packages/shared` |
-| IDB connection | `packages/database` |
-| queries | `packages/database` |
+| types / date / math / validation / HLC | `packages/shared` |
+| IDB connection, queries, sync migration | `packages/database` |
 | stores | `packages/stores` |
-| BookCard | `apps/web` |
-| LedgerSection | `apps/web` |
-| ParserBar | `apps/web` |
+| sync engine: convergence, crash injection, crypto, pairing/session integration, hardening, perf (env-gated) | `packages/sync` |
+| BookCard, LedgerSection, ParserBar, SyncScreen, PairDeviceModal, ConflictLogModal | `apps/web` |
 
 ### Type-check only
 
@@ -295,10 +304,19 @@ No data is ever sent to any server.
 
 ---
 
-## Device Sync (planned)
+## Device Sync
 
-Phase 6 adds peer-to-peer sync between a user's devices over the local
-network — no central server ever holds the data. Devices pair via QR code,
+Peer-to-peer sync between your devices over the local network — no central
+server ever holds the data. Devices pair via QR code (or a copyable code),
 exchange deltas over an encrypted WebSocket channel, and merge with row-level
-last-write-wins on hybrid logical clocks. See the full design and behavior
-diagrams in [`docs/sync/DESIGN.md`](docs/sync/DESIGN.md).
+last-write-wins on hybrid logical clocks. Conflicts are resolved automatically
+(newest change wins) and recorded in a per-device conflict log.
+
+- Open **Settings → Device Sync** to pair devices and trigger a sync.
+- The desktop app listens on port `45680` (fallback `45681–45689`) while open;
+  phones, browsers, and other desktops connect to it. Devices that cannot
+  listen (phone↔phone) converge transitively through a desktop.
+- Sync is manual in v1 — tap **Sync now** with both apps open.
+
+See the full design, behavior diagrams, and as-built notes in
+[`docs/sync/DESIGN.md`](docs/sync/DESIGN.md).

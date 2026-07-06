@@ -110,6 +110,10 @@ export class SyncEngine {
   /** Dialing side: pull from the peer, then serve the peer's pull, then complete. */
   async initiate(channel: PeerChannel, peerDeviceId: string): Promise<SyncSessionResult> {
     const reader = new MessageReader(channel);
+    // Bulk window: on sql.js, defer the whole-DB IndexedDB serialization to
+    // one write at session end. Crash mid-bulk reverts data AND cursor
+    // together (same image), preserving the §5.4 resume story.
+    this.deps.conn.beginBulk?.();
     try {
       const pull = await this.runPullHalf(channel, reader, peerDeviceId);
       const push = await this.runPushHalf(channel, reader, peerDeviceId);
@@ -121,12 +125,15 @@ export class SyncEngine {
       this.emit({ phase: 'error' });
       await channel.close().catch(() => undefined);
       throw e;
+    } finally {
+      await this.deps.conn.endBulk?.();
     }
   }
 
   /** Listening side: serve the client's pull, then pull ourselves, then await completion. */
   async respond(channel: PeerChannel, peerDeviceId: string): Promise<SyncSessionResult> {
     const reader = new MessageReader(channel);
+    this.deps.conn.beginBulk?.();
     try {
       const pushed = await this.runPushHalf(channel, reader, peerDeviceId);
       const pull = await this.runPullHalf(channel, reader, peerDeviceId);
@@ -137,6 +144,8 @@ export class SyncEngine {
       this.emit({ phase: 'error' });
       await channel.close().catch(() => undefined);
       throw e;
+    } finally {
+      await this.deps.conn.endBulk?.();
     }
   }
 

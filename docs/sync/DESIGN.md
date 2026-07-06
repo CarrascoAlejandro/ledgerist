@@ -499,6 +499,63 @@ Android Keystore).
 
 1. **Browser-shell durability**: browsers can evict IndexedDB; a synced browser
    profile that loses data recovers by re-syncing — confirm that story is
-   acceptable.
+   acceptable. *(Resolved: accepted — the browser is a full participant.)*
 2. **Manual pairing string length**: acceptable given QR is the primary path?
+   *(Resolved: accepted.)*
 3. **Conflict log depth**: is read-only (no restore) enough for v1?
+   *(Resolved: read-only for v1.)*
+
+---
+
+## As-built notes (implementation phases 6a–6e)
+
+Deviations and decisions made during implementation:
+
+- **Conflict detection** uses `sync_peers.acked_through_seq` — the highest seq
+  of *our own* change log the peer has acknowledged applying (updated after
+  each completed push half). A LWW overwrite is recorded as a conflict only
+  when the local row's changelog seq is above that mark, i.e. it changed after
+  the peer last saw our state. This eliminates false conflicts from ordinary
+  propagation ("peer edited a row I wrote last month"). Consequence: a genuine
+  concurrent edit is logged **once, on the device that merges it first** — the
+  losing device may not have its own record (the conflict log is per-device
+  and not synced).
+- **Merge transactions**: `IDBConnection.transaction` takes a prebuilt ops
+  array (no reads inside), so each `changes` batch commits its own write-only
+  transaction; the post-passes (transfer repair, balance recompute) and the
+  cursor advance share one final transaction. Idempotent re-apply (§5.4)
+  keeps interrupted sessions safe.
+- **Lazy stamping** (`stampUnstampedRows`) runs *before* the push snapshot is
+  taken — the stamp fires the changelog trigger, which would otherwise push
+  those rows past the snapshot bound and silently out of the delta.
+- **Server**: fixed port **45680**, EADDRINUSE fallback through **45689**,
+  auto-started in the Electron main process on app ready; the renderer can
+  toggle it (preference persisted in localStorage `ledger.sync.serverEnabled`).
+- **QR / scanning**: `qrcode` renders the pairing QR in all shells;
+  `@capacitor/barcode-scanner` (official plugin, self-contained native scan
+  UI) provides scanning on Android; paste is the fallback everywhere.
+- **Android cleartext**: `capacitor.config.ts` sets
+  `android.allowMixedContent: true` (WebView mixed-content blocker). The OS
+  cleartext policy (API 28+) additionally needs
+  `android:usesCleartextTraffic="true"` on `<application>` — `android/` is
+  regenerated, so this is a documented post-`cap add` step (see README).
+  **On-device verification is still pending** (manual QA).
+- **Bulk persistence**: optional `beginBulk()/endBulk()` on `IDBConnection`;
+  the sql.js driver defers its whole-DB IndexedDB serialization to one write
+  per sync session (the engine wraps each session in a bulk window). Crash
+  mid-bulk reverts data and cursor together — the resume story is unchanged.
+- **Perf** (Node, loopback, in-memory sql.js): cursor-0 full sync of 50,210
+  rows ≈ 5.5 s (~9,000 rows/s); steady-state empty session ≈ 12 ms.
+- **Protocol note**: sessions are strictly turn-based request/response, which
+  the inbound acceptor relies on when peeking the first frame to route
+  pairing vs sync (no frames are in flight while it re-registers handlers).
+- **SecureChannel ordering**: inbound frames are decrypted through a serial
+  promise chain, and the close event is routed through the same chain.
+  Without this, two concurrent async decrypts can complete out of order (a
+  small frame overtaking a large one) tripping the replay counter, and a
+  socket close can outrace the final in-flight frame — both observed as rare
+  failures under CPU contention before the fix.
+- **`updated_at` is not a convergence surface**: balance-only ledger updates
+  bump it without bumping `version_hlc`, so identical synced content can
+  carry different `updated_at` values on different devices (display-only,
+  per the design).

@@ -232,14 +232,19 @@ export class SecureChannel implements PeerChannel {
   private lastReceived = 0n;
   private frameCb: ((frame: Uint8Array) => void) | null = null;
   private pendingPlaintext: Uint8Array[] = [];
+  private receiveChain: Promise<void> = Promise.resolve();
 
   constructor(
     private inner: PeerChannel,
     private sendKey: CryptoKey,
     private receiveKey: CryptoKey,
   ) {
+    // Serialize frame processing: decrypts are async, and two running
+    // concurrently can complete out of order (a small frame overtaking a
+    // large one), which would both reorder delivery and trip the replay
+    // counter on the legitimate frame.
     this.inner.onFrame((frame) => {
-      void this.receive(frame);
+      this.receiveChain = this.receiveChain.then(() => this.receive(frame));
     });
   }
 
@@ -312,7 +317,12 @@ export class SecureChannel implements PeerChannel {
   }
 
   onClose(cb: (reason?: string) => void): void {
-    this.inner.onClose(cb);
+    // Route through the receive chain so any frame still being decrypted is
+    // delivered before the close fires (otherwise a session's final message
+    // can lose the race against the socket teardown that follows it).
+    this.inner.onClose((reason) => {
+      this.receiveChain = this.receiveChain.then(() => cb(reason));
+    });
   }
 
   async close(reason?: string): Promise<void> {
