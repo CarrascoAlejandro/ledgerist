@@ -8,10 +8,12 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@ledger/shared": "*",
-    "@ledger/database": "*"
+    "@ledger/database": "*",
+    "@ledger/shared": "*"
   },
   "devDependencies": {
-    "@ledger/stores": "*"
+    "@ledger/stores": "*",
+    "@types/ws": "^8.18.1",
+    "ws": "^8.21.0"
   }
 }

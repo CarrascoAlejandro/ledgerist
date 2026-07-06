@@ -8,17 +8,19 @@
   "main": "dist/main.js",
   "scripts": {
     "build:web": "npm run build -w @ledger/web",
-    "build:ts": "esbuild src/main.ts --bundle --platform=node --external:electron --external:better-sqlite3 --external:sql.js --outdir=dist --format=cjs --sourcemap && esbuild src/preload.ts --bundle --platform=node --external:electron --outdir=dist --format=cjs --sourcemap",
+    "build:ts": "esbuild src/main.ts --bundle --platform=node --external:electron --external:better-sqlite3 --external:sql.js --external:ws --external:bufferutil --external:utf-8-validate --outdir=dist --format=cjs --sourcemap && esbuild src/preload.ts --bundle --platform=node --external:electron --outdir=dist --format=cjs --sourcemap",
     "build": "npm run build:web && npm run build:ts && electron-builder",
     "start": "electron dist/main.js",
     "dev": "npm run build:web && npm run build:ts && electron dist/main.js",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "better-sqlite3": "^11.1.2"
+    "better-sqlite3": "^11.1.2",
+    "ws": "^8.18.0"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.11",
+    "@types/ws": "^8.5.12",
     "electron": "^31.3.1",
     "esbuild": "^0.23.0",
     "electron-builder": "^24.13.3"
