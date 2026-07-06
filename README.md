@@ -44,7 +44,7 @@ required.
 | Database (desktop) | better-sqlite3 (native SQLite via Electron IPC) |
 | Database (mobile) | @capacitor-community/sqlite (native SQLite on Android) |
 | Build | Vite 5 (web), esbuild (desktop) |
-| Packaging | electron-builder (.dmg / .exe / .deb), Capacitor 6 (Android) |
+| Packaging | electron-builder (.dmg / .exe / .deb), Capacitor 8 (Android) |
 | Tests | Jest 29, ts-jest, @testing-library/react |
 | Language | TypeScript 5 (strict) |
 
@@ -177,10 +177,14 @@ Capacitor driver instead of sql.js.
 
 ### Prerequisites
 
-- **JDK 17** (exactly — Capacitor 6's Gradle 8.2 does not support JDK 21; if your
-  default `java` is newer, point `JAVA_HOME` at a JDK 17 when building, e.g.
-  `JAVA_HOME=~/.sdkman/candidates/java/17.0.11-tem npm run mobile:android`)
-- Android Studio (or the Android SDK command-line tools) with `ANDROID_HOME` set
+- **JDK 21** (a full JDK, not a JRE — Gradle needs `javac`; headless
+  `openjdk-21-jre` installs fail with "does not provide the required
+  capabilities: [JAVA_COMPILER]". Prefer a standard distribution such as
+  Temurin: GraalVM's `jlink` breaks the Android `JdkImageTransform` step.
+  E.g. `JAVA_HOME=~/.sdkman/candidates/java/21.0.6-tem npm run mobile:android`)
+- Android Studio (or the Android SDK command-line tools) with `ANDROID_HOME` set,
+  including platform 36 and build-tools 36
+  (`sdkmanager "platforms;android-36" "build-tools;36.0.0"`)
 - An emulator or a device with USB debugging enabled
 
 ### One-time setup

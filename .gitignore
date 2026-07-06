@@ -39,3 +39,4 @@ electron/
 
 # Vite
 .vite/
+dist-electron/
