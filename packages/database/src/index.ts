@@ -25,3 +25,13 @@ export async function createDesktopConnection(
   const { createDesktopConnection: factory } = await import('./drivers/create-desktop.js');
   return factory(name, opts);
 }
+
+// Lazy-load createCapacitorConnection so that @capacitor-community/sqlite is never
+// loaded in web, desktop, or test environments.
+export async function createCapacitorConnection(
+  name: string,
+  opts: DBConnectionOptions = {},
+): Promise<IDBConnection> {
+  const { createCapacitorConnection: factory } = await import('./drivers/create-capacitor.js');
+  return factory(name, opts);
+}

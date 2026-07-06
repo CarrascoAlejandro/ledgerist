@@ -15,9 +15,13 @@
     "@types/sql.js": "^1.4.9"
   },
   "peerDependencies": {
+    "@capacitor-community/sqlite": "^6.0.2",
     "better-sqlite3": "^11"
   },
   "peerDependenciesMeta": {
+    "@capacitor-community/sqlite": {
+      "optional": true
+    },
     "better-sqlite3": {
       "optional": true
     }

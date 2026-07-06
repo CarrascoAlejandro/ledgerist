@@ -42,8 +42,9 @@ required.
 | State | Zustand stores (book, ledger, entry, settings, navigation) |
 | Database (web) | sql.js (SQLite compiled to WebAssembly), runs entirely in the browser |
 | Database (desktop) | better-sqlite3 (native SQLite via Electron IPC) |
+| Database (mobile) | @capacitor-community/sqlite (native SQLite on Android) |
 | Build | Vite 5 (web), esbuild (desktop) |
-| Packaging | electron-builder (.dmg / .exe / .deb) |
+| Packaging | electron-builder (.dmg / .exe / .deb), Capacitor 6 (Android) |
 | Tests | Jest 29, ts-jest, @testing-library/react |
 | Language | TypeScript 5 (strict) |
 
@@ -59,16 +60,19 @@ ledger-project/
 │   │   │   ├── components/   # BookCard, LedgerSection, ParserBar, …
 │   │   │   ├── screens/      # DashboardScreen, BookOverviewScreen, AppSettingsScreen
 │   │   │   ├── App.tsx
-│   │   │   └── main.tsx      # Detects Electron and switches DB driver automatically
+│   │   │   └── main.tsx      # Detects Capacitor/Electron and switches DB driver automatically
 │   │   └── __tests__/        # Component tests
-│   └── desktop/              # Electron wrapper
-│       ├── src/
-│       │   ├── main.ts       # Electron main process (DB init, IPC handlers, BrowserWindow)
-│       │   └── preload.ts    # contextBridge — exposes window.electronAPI.db to renderer
-│       └── dist/             # esbuild output (main.js, preload.js)
+│   ├── desktop/              # Electron wrapper
+│   │   ├── src/
+│   │   │   ├── main.ts       # Electron main process (DB init, IPC handlers, BrowserWindow)
+│   │   │   └── preload.ts    # contextBridge — exposes window.electronAPI.db to renderer
+│   │   └── dist/             # esbuild output (main.js, preload.js)
+│   └── mobile/               # Capacitor wrapper (Android)
+│       ├── capacitor.config.ts
+│       └── android/          # Generated native project (gitignored — see Mobile App)
 ├── packages/
 │   ├── shared/               # Domain types (Book, Ledger, Entry, AppSettings) + utils
-│   ├── database/             # IDBConnection interface + drivers (web, desktop, renderer)
+│   ├── database/             # IDBConnection interface + drivers (web, desktop, renderer, capacitor)
 │   └── stores/               # Zustand stores
 ├── package.json              # npm workspaces root
 └── tsconfig.base.json
@@ -164,6 +168,54 @@ npx tsc -p apps/desktop/tsconfig.json --noEmit
 
 ---
 
+## Mobile App (Android via Capacitor)
+
+The same React app runs inside a Capacitor webview with a native SQLite
+database (`@capacitor-community/sqlite`). `main.tsx` detects the native
+platform via the injected `window.Capacitor` global and selects the
+Capacitor driver instead of sql.js.
+
+### Prerequisites
+
+- **JDK 17** (exactly — Capacitor 6's Gradle 8.2 does not support JDK 21; if your
+  default `java` is newer, point `JAVA_HOME` at a JDK 17 when building, e.g.
+  `JAVA_HOME=~/.sdkman/candidates/java/17.0.11-tem npm run mobile:android`)
+- Android Studio (or the Android SDK command-line tools) with `ANDROID_HOME` set
+- An emulator or a device with USB debugging enabled
+
+### One-time setup
+
+The native `android/` project is **gitignored** and regenerated from the
+Capacitor config (no manual native edits are required):
+
+```bash
+npm run build                                  # cap requires apps/web/dist to exist
+cd apps/mobile && npx cap add android
+```
+
+### Run on a device or emulator
+
+From the repo root:
+
+```bash
+npm run mobile:android
+```
+
+This builds the web app, syncs it into the native project, and launches
+`cap run android` (which prompts for a target device/emulator).
+
+Other scripts:
+
+| Command | Effect |
+|---------|--------|
+| `npm run mobile:sync` | Build web + copy assets into `android/` without running |
+| `npm run open:android -w @ledger/mobile` | Open the native project in Android Studio |
+
+> Data is stored in a native SQLite file named `ledgerSQLite.db` (the plugin
+> appends the `SQLite.db` suffix) inside the app's private databases directory.
+
+---
+
 ## Testing
 
 Run all tests across every package:
@@ -233,5 +285,6 @@ transfer <amount> #<source> to #<target>
 |------|---------|
 | Browser | sql.js in-memory SQLite, persisted to `IndexedDB` between sessions |
 | Desktop | Native SQLite file via `better-sqlite3`, stored in the OS user-data directory |
+| Mobile (Android) | Native SQLite file (`ledgerSQLite.db`) via `@capacitor-community/sqlite`, stored in the app's private databases directory |
 
 No data is ever sent to any server.

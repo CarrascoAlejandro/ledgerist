@@ -9,7 +9,15 @@ import { setDB } from '@ledger/stores';
 async function init() {
   let db: IDBConnection;
 
-  if (typeof window !== 'undefined' && 'electronAPI' in window) {
+  // Capacitor injects window.Capacitor into the native webview; detecting via the
+  // global avoids adding @capacitor/core as a dependency of the web app.
+  const capacitor = (window as { Capacitor?: { isNativePlatform?: () => boolean } })
+    .Capacitor;
+
+  if (typeof window !== 'undefined' && capacitor?.isNativePlatform?.()) {
+    const { createCapacitorConnection } = await import('@ledger/database');
+    db = await createCapacitorConnection('ledger');
+  } else if (typeof window !== 'undefined' && 'electronAPI' in window) {
     const { ElectronRendererConnection } = await import('@ledger/database');
     db = new ElectronRendererConnection();
   } else {

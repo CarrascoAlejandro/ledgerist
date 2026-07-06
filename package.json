@@ -11,6 +11,8 @@
     "build": "npm run build -w apps/web",
     "desktop": "npm run dev -w @ledger/desktop",
     "build:desktop": "npm run build -w @ledger/desktop",
+    "mobile:sync": "npm run sync -w @ledger/mobile",
+    "mobile:android": "npm run android -w @ledger/mobile",
     "test": "jest",
     "test:watch": "jest --watch",
     "typecheck": "tsc --build --noEmit"
