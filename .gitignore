@@ -40,3 +40,7 @@ electron/
 # Vite
 .vite/
 dist-electron/
+
+# Android release signing (keep the keystore backed up outside git!)
+*.keystore
+keystore.properties

@@ -1,0 +1,107 @@
+name: Release
+
+# Builds beta/release artifacts for every pushed v* tag and attaches them to a
+# draft GitHub Release: .deb + .AppImage (Linux), .exe (Windows), signed .apk
+# (Android). Windows must build on a Windows runner — better-sqlite3 is a
+# native module and cannot be cross-compiled.
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  desktop-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build:desktop
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-desktop
+          path: |
+            apps/desktop/dist-electron/*.deb
+            apps/desktop/dist-electron/*.AppImage
+          if-no-files-found: error
+
+  desktop-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build:desktop
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-desktop
+          path: apps/desktop/dist-electron/*.exe
+          if-no-files-found: error
+
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci
+      - run: npm run build
+      - name: Generate and patch native project
+        working-directory: apps/mobile
+        run: |
+          npm run add:android
+          npx cap sync android
+      - name: Decode signing keystore
+        working-directory: apps/mobile
+        run: printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 -d > ledger-release.keystore
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      - name: Build signed APK
+        working-directory: apps/mobile
+        run: |
+          npx cap build android \
+            --keystorepath "$PWD/ledger-release.keystore" \
+            --keystorepass "$ANDROID_KEYSTORE_PASSWORD" \
+            --keystorealias "$ANDROID_KEY_ALIAS" \
+            --keystorealiaspass "$ANDROID_KEY_PASSWORD" \
+            --androidreleasetype APK
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      - name: Rename APK to versioned artifact
+        run: mv apps/mobile/android/app/build/outputs/apk/release/app-release-signed.apk "Ledger_$(node -p "require('./package.json').version").apk"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: Ledger_*.apk
+          if-no-files-found: error
+
+  release:
+    needs: [desktop-linux, desktop-windows, android]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          generate_release_notes: true
+          files: artifacts/*

@@ -194,26 +194,23 @@ Capacitor config (no manual native edits are required):
 
 ```bash
 npm run build                                  # cap requires apps/web/dist to exist
-cd apps/mobile && npx cap add android
+cd apps/mobile && npm run add:android
 ```
 
-**Post-`cap add` step for Device Sync:** Android API 28+ blocks cleartext
-traffic, which includes the `ws://` LAN connections sync uses (payloads are
-app-layer AES-GCM encrypted regardless). After regenerating the native
-project, add this attribute to `<application>` in
-`android/app/src/main/AndroidManifest.xml`:
+`add:android` runs `cap add android` followed by `prepare-android.mjs`, which
+patches the generated project (idempotent — rerun any time with
+`npm run prepare:android -w @ledger/mobile`):
 
-```xml
-<application android:usesCleartextTraffic="true" ...>
-```
-
-(The WebView mixed-content side is already handled by
-`android.allowMixedContent` in `capacitor.config.ts`.)
-
-**Post-`cap add` step for the barcode scanner:** the
-`@capacitor/barcode-scanner` native library requires `minSdk 26` — raise
-`minSdkVersion` from the generated default to `26` in
-`android/variables.gradle`, or the Gradle manifest merger fails.
+- `android:usesCleartextTraffic="true"` on `<application>` — Android API 28+
+  blocks cleartext traffic, which includes the `ws://` LAN connections Device
+  Sync uses (payloads are app-layer AES-GCM encrypted regardless). The WebView
+  mixed-content side is already handled by `android.allowMixedContent` in
+  `capacitor.config.ts`.
+- `minSdkVersion 26` — required by `@capacitor/barcode-scanner`'s native
+  library, or the Gradle manifest merger fails.
+- `versionName` / `versionCode` derived from the package version
+  (`versionCode = major*10000 + minor*100 + patch`), so release APKs upgrade
+  in place.
 
 ### Run on a device or emulator
 
@@ -275,6 +272,53 @@ npm run typecheck
 # or, for the web app specifically:
 npx tsc -p apps/web/tsconfig.json --noEmit
 ```
+
+---
+
+## Releases (beta distribution)
+
+Pushing a `v*` tag runs `.github/workflows/release.yml`, which builds all
+distributable artifacts and attaches them to a **draft** GitHub Release:
+
+| Artifact | Built on | Notes |
+|----------|----------|-------|
+| `Ledger_<version>_amd64.deb` | ubuntu runner | Debian/Ubuntu installer |
+| `Ledger-<version>.AppImage` | ubuntu runner | Portable — `chmod +x` and run, any distro |
+| `Ledger Setup <version>.exe` | windows runner | NSIS installer; unsigned, so SmartScreen warns — "More info → Run anyway" |
+| `Ledger_<version>.apk` | ubuntu runner | Signed release APK; sideload with "Install unknown apps" enabled |
+
+To cut a release:
+
+```bash
+npm version 0.2.0 --no-git-tag-version            # root
+npm pkg set version=0.2.0 -w apps/web -w @ledger/desktop -w @ledger/mobile
+git commit -am "chore: v0.2.0" && git tag v0.2.0
+git push && git push --tags
+```
+
+Then review the draft release on GitHub and publish it.
+
+### Android signing
+
+The APK is signed with `apps/mobile/ledger-release.keystore` (gitignored,
+passwords in the gitignored `apps/mobile/keystore.properties`). **Back both
+files up outside this machine** — losing the keystore means testers must
+uninstall/reinstall (the update signature won't match), and every future APK
+must be signed with it.
+
+The workflow reads four repository secrets (Settings → Secrets and variables →
+Actions):
+
+| Secret | Value |
+|--------|-------|
+| `ANDROID_KEYSTORE_BASE64` | `base64 -w0 apps/mobile/ledger-release.keystore` |
+| `ANDROID_KEYSTORE_PASSWORD` | `storePassword` from `keystore.properties` |
+| `ANDROID_KEY_ALIAS` | `ledger` |
+| `ANDROID_KEY_PASSWORD` | `keyPassword` from `keystore.properties` |
+
+Note: the phone build installed via `npm run mobile:android` is a
+debug-signed APK — a release APK cannot install over it (signature mismatch).
+Uninstall the debug app first, or test releases on a different device.
 
 ---
 

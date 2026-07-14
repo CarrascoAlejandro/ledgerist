@@ -1,12 +1,13 @@
 {
   "name": "@ledger/mobile",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "private": true,
   "scripts": {
-    "add:android": "cap add android",
+    "add:android": "cap add android && node prepare-android.mjs",
     "sync": "npm run build -w @ledger/web && cap sync android",
     "android": "npm run build -w @ledger/web && cap sync android && cap run android",
-    "open:android": "cap open android"
+    "open:android": "cap open android",
+    "prepare:android": "node prepare-android.mjs"
   },
   "dependencies": {
     "@capacitor-community/sqlite": "^8.1.0",
