@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useSyncStore } from '@ledger/stores';
 import PairDeviceModal from '../src/components/PairDeviceModal.js';
@@ -128,7 +128,9 @@ describe('PairDeviceModal — join mode', () => {
       });
       render(<PairDeviceModal mode="join" canScan={false} onClose={onClose} />);
       expect(screen.getByText('Device paired ✓')).toBeInTheDocument();
-      jest.advanceTimersByTime(1500);
+      act(() => {
+        jest.advanceTimersByTime(1500);
+      });
       expect(onClose).toHaveBeenCalled();
     } finally {
       jest.useRealTimers();

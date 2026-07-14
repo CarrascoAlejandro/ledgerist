@@ -5,9 +5,9 @@ user's devices **without any central server holding ground truth**. Devices sync
 peer-to-peer, git-style; when the same row was changed on both sides, the most
 recent write wins.
 
-This document describes how the end product behaves. Implementation is phased
-(see [Implementation phasing](#implementation-phasing)); nothing in this
-document is built yet.
+This document describes how the end product behaves. Implementation was phased
+(see [Implementation phasing](#implementation-phasing)); all phases (6a–6e) are
+built, and this document has been finalized against the as-built system.
 
 **Diagrams** (PlantUML sources in this directory — render with an IDE PlantUML
 extension or <https://www.plantuml.com/plantuml>):

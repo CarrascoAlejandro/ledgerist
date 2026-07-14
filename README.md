@@ -210,6 +210,11 @@ project, add this attribute to `<application>` in
 (The WebView mixed-content side is already handled by
 `android.allowMixedContent` in `capacitor.config.ts`.)
 
+**Post-`cap add` step for the barcode scanner:** the
+`@capacitor/barcode-scanner` native library requires `minSdk 26` — raise
+`minSdkVersion` from the generated default to `26` in
+`android/variables.gradle`, or the Gradle manifest merger fails.
+
 ### Run on a device or emulator
 
 From the repo root:

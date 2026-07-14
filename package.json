@@ -15,7 +15,7 @@
     "mobile:android": "npm run android -w @ledger/mobile",
     "test": "jest",
     "test:watch": "jest --watch",
-    "typecheck": "tsc --build --noEmit"
+    "typecheck": "tsc -p packages/shared --noEmit && tsc -p packages/database --noEmit && tsc -p packages/stores --noEmit && tsc -p packages/sync --noEmit && tsc -p apps/web --noEmit && tsc -p apps/desktop --noEmit && tsc -p apps/mobile --noEmit"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.4.2",
