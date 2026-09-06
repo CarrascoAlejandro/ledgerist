@@ -246,6 +246,11 @@ export const useEntryStore = create<EntryState & EntryActions>((set, get) => ({
 
       ops.push(buildOps.updateLedgerBalance(entry.ledger_id, newBalance));
 
+      const balanceUpdates: Array<{ ledger_id: string; balance: number }> = [
+        { ledger_id: entry.ledger_id, balance: newBalance },
+      ];
+      let pairedEntry_id: string | null = null;
+
       // Sync transfer pair amount if changed
       if (entry.transfer_group_id && updates.amount !== undefined) {
         const group = await q.getTransferGroup(entry.transfer_group_id);
@@ -264,8 +269,10 @@ export const useEntryStore = create<EntryState & EntryActions>((set, get) => ({
             const pairedOp = buildOps.updateEntryFields(paired.entry_id, { amount: newAmount });
             if (pairedOp) {
               ops.push(pairedOp);
+              pairedEntry_id = paired.entry_id;
             }
             ops.push(buildOps.updateLedgerBalance(paired.ledger_id, pairedBalance));
+            balanceUpdates.push({ ledger_id: paired.ledger_id, balance: pairedBalance });
           }
         }
       }
@@ -277,14 +284,23 @@ export const useEntryStore = create<EntryState & EntryActions>((set, get) => ({
         return { success: false, error: 'Entry not found after update', code: 'DATABASE_ERROR' };
       }
 
+      // The paired row was written in the same transaction; re-read it so the
+      // other ledger's list reflects the new amount without a refetch.
+      const updatedPaired = pairedEntry_id ? await q.getEntryById(pairedEntry_id) : null;
+
       set((state) => ({
-        entries: state.entries.map((e) => (e.entry_id === entry_id ? updatedEntry : e)),
+        entries: state.entries.map((e) => {
+          if (e.entry_id === entry_id) return updatedEntry;
+          if (updatedPaired && e.entry_id === updatedPaired.entry_id) return updatedPaired;
+          return e;
+        }),
       }));
 
       useLedgerStore.setState((state) => ({
-        ledgers: state.ledgers.map((l) =>
-          l.ledger_id === entry.ledger_id ? { ...l, balance: newBalance } : l,
-        ),
+        ledgers: state.ledgers.map((l) => {
+          const update = balanceUpdates.find((u) => u.ledger_id === l.ledger_id);
+          return update ? { ...l, balance: update.balance } : l;
+        }),
       }));
 
       return { success: true, data: updatedEntry };
