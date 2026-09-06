@@ -71,19 +71,43 @@ jobs:
         run: printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 -d > ledger-release.keystore
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-      - name: Build signed APK
+      # Deliberately NOT `npx cap build android`: that signs by rewriting the
+      # zip, which destroys the page alignment of the uncompressed .so entries
+      # AGP emits for release builds (extractNativeLibs=false). The resulting
+      # APK fails to install with "Failed to extract native libraries, res=-2".
+      # zipalign first, then apksigner — which preserves alignment.
+      - name: Assemble unsigned release APK
+        working-directory: apps/mobile/android
+        run: ./gradlew assembleRelease
+      - name: Align and sign APK
         working-directory: apps/mobile
         run: |
-          npx cap build android \
-            --keystorepath "$PWD/ledger-release.keystore" \
-            --keystorepass "$ANDROID_KEYSTORE_PASSWORD" \
-            --keystorealias "$ANDROID_KEY_ALIAS" \
-            --keystorealiaspass "$ANDROID_KEY_PASSWORD" \
-            --androidreleasetype APK
+          set -euo pipefail
+          BUILD_TOOLS="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
+          echo "Using build-tools: $BUILD_TOOLS"
+          OUT=android/app/build/outputs/apk/release
+          "$BUILD_TOOLS/zipalign" -p -f 4 "$OUT/app-release-unsigned.apk" "$OUT/app-release-aligned.apk"
+          "$BUILD_TOOLS/apksigner" sign \
+            --ks ledger-release.keystore \
+            --ks-pass "pass:$ANDROID_KEYSTORE_PASSWORD" \
+            --ks-key-alias "$ANDROID_KEY_ALIAS" \
+            --key-pass "pass:$ANDROID_KEY_PASSWORD" \
+            --out "$OUT/app-release-signed.apk" \
+            "$OUT/app-release-aligned.apk"
         env:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      # Guard against shipping another uninstallable APK: both checks must pass
+      # on the *signed* artifact, since signing is what previously broke it.
+      - name: Verify alignment and signature
+        working-directory: apps/mobile
+        run: |
+          set -euo pipefail
+          BUILD_TOOLS="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
+          APK=android/app/build/outputs/apk/release/app-release-signed.apk
+          "$BUILD_TOOLS/zipalign" -c -p 4 "$APK"
+          "$BUILD_TOOLS/apksigner" verify --print-certs "$APK"
       - name: Rename APK to versioned artifact
         run: mv apps/mobile/android/app/build/outputs/apk/release/app-release-signed.apk "Ledger_$(node -p "require('./package.json').version").apk"
       - uses: actions/upload-artifact@v4
