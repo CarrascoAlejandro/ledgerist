@@ -47,3 +47,4 @@ keystore.properties
 
 # Local agent settings (machine-specific)
 .claude/settings.local.json
+.claude/skills/
