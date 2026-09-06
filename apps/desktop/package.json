@@ -28,6 +28,7 @@
   "build": {
     "appId": "com.ledger.desktop",
     "productName": "Ledger",
+    "executableName": "ledger-desktop",
     "electronVersion": "31.7.7",
     "artifactName": "${productName}_${version}_${arch}.${ext}",
     "files": [
@@ -49,7 +50,14 @@
       "target": "nsis"
     },
     "linux": {
-      "target": ["deb", "AppImage"]
+      "target": [
+        "deb",
+        "AppImage"
+      ],
+      "category": "Office"
+    },
+    "deb": {
+      "packageName": "ledger-desktop"
     }
   }
 }
