@@ -22,6 +22,15 @@ export default function LedgerSuggestion({ ledgers, filter, onSelect }: Props) {
         <li key={ledger.ledger_id}>
           <button
             type="button"
+            // Focus is moved by mousedown's default action (the compatibility
+            // mouse event Android WebView synthesises from the tap). Letting it
+            // through blurs the parser input, which dismisses the soft keyboard
+            // mid-typing. Cancelling it keeps focus — and the keyboard — in the
+            // input; the click event still fires, so onSelect is unaffected.
+            onMouseDown={(e) => e.preventDefault()}
+            // Also keep these out of the tab order so keyboard users stay on the
+            // input and drive the list from there rather than tabbing into it.
+            tabIndex={-1}
             onClick={() => onSelect(ledger)}
             className="flex w-full items-center gap-2 px-3 py-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-700"
           >

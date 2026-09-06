@@ -219,4 +219,57 @@ describe('ParserBar', () => {
     expect(dateInput).toBeInTheDocument();
     expect(dateInput).toHaveAttribute('type', 'date');
   });
+
+  describe('ledger suggestion dropdown', () => {
+    // An unresolved '#' token at the end of the input is what opens the list.
+    function showSuggestions() {
+      mockEntryStoreState.parserInput = 'today 50 #gro';
+      mockEntryStoreState.parserPreview = {
+        raw: 'today 50 #gro',
+        parsed_date: '2024-01-25',
+        parsed_ledger: null,
+        parsed_amount: 50,
+        parsed_direction: 'sub',
+        parsed_detail: null,
+        is_transfer: false,
+        resolved_transfer_target: null,
+        errors: [],
+        warnings: [],
+      };
+      return renderParserBar();
+    }
+
+    it('keeps focus on the input when a suggestion is tapped', async () => {
+      const user = userEvent.setup();
+      showSuggestions();
+      const input = screen.getByPlaceholderText('today 50 #groceries coffee');
+      const suggestion = screen.getByText('Groceries');
+
+      act(() => input.focus());
+      expect(input).toHaveFocus();
+
+      await act(async () => {
+        await user.click(suggestion);
+      });
+
+      // On Android, losing focus here dismisses the soft keyboard mid-entry.
+      expect(input).toHaveFocus();
+      expect(mockUpdateParserInput).toHaveBeenCalled();
+    });
+
+    it('cancels mousedown on suggestions so focus is never moved', () => {
+      showSuggestions();
+      const suggestion = screen.getByText('Groceries').closest('button')!;
+
+      const event = new MouseEvent('mousedown', { bubbles: true, cancelable: true });
+      suggestion.dispatchEvent(event);
+
+      expect(event.defaultPrevented).toBe(true);
+    });
+
+    it('keeps suggestions out of the tab order', () => {
+      showSuggestions();
+      expect(screen.getByText('Groceries').closest('button')).toHaveAttribute('tabindex', '-1');
+    });
+  });
 });

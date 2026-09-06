@@ -79,6 +79,10 @@ export default function ParserBar({ bookId, onClose }: Props) {
     handleInput(newInput);
     if (inputRef.current) {
       inputRef.current.value = newInput;
+      // Belt and braces: the suggestion button cancels mousedown so focus never
+      // leaves, but if anything else did steal it, take it back inside the tap
+      // handler — the only place a WebView will honour a programmatic focus.
+      inputRef.current.focus();
     }
     setOverrides((prev) => ({ ...prev, parsed_ledger: ledger }));
   }
