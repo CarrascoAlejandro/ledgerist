@@ -44,3 +44,6 @@ dist-electron/
 # Android release signing (keep the keystore backed up outside git!)
 *.keystore
 keystore.properties
+
+# Local agent settings (machine-specific)
+.claude/settings.local.json
