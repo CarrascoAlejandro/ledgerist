@@ -11,7 +11,7 @@
     "@ledger/database": "*",
     "@ledger/shared": "*",
     "@ledger/sync": "*",
-    "zustand": "^4.5.4"
+    "zustand": "^5.0.15"
   },
   "license": "GPL-3.0-or-later"
 }
