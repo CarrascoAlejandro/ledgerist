@@ -89,8 +89,8 @@ ledger-project/
 
 ### Prerequisites
 
-- Node.js ≥ 18
-- npm ≥ 9
+- Node.js ≥ 22 (required by `@capacitor/cli`; enforced via `engine-strict`)
+- npm ≥ 10
 
 ### Install dependencies
 
@@ -135,7 +135,7 @@ in the OS user-data directory:
 
 ### Prerequisites
 
-In addition to Node.js ≥ 18 and npm ≥ 9, you need the native build toolchain
+In addition to Node.js ≥ 22 and npm ≥ 10, you need the native build toolchain
 for `better-sqlite3`:
 
 - **Linux/macOS**: `gcc`/`clang` + Python 3 (usually already present)

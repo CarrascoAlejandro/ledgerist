@@ -1,0 +1,36 @@
+# Dependabot configuration.
+#
+# This file controls *version update* PRs only. Security alerts are a separate
+# system that is on by default for public repositories and is NOT configured
+# here — see notes/security-audit.md for how to quiet the low-impact ones.
+#
+# The repo carries a lot of build-time-only advisories (vite, esbuild, postcss,
+# electron-builder). Grouping keeps that from becoming a wall of PRs.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 5
+    # One PR per group instead of one per package.
+    groups:
+      production:
+        dependency-type: production
+        update-types: [minor, patch]
+      dev-tooling:
+        dependency-type: development
+        update-types: [minor, patch]
+    # Majors are deliberately left ungrouped: electron, react-router and
+    # capacitor all need reading release notes before merging.
+    labels: [dependencies]
+
+  # Keeps actions/checkout, setup-node, setup-java and the release action from
+  # silently rotting. Action majors are the usual cause of a pipeline that
+  # "suddenly" stops working.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+    labels: [dependencies]

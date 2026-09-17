@@ -1,6 +1,6 @@
 {
-  "name": "ledger-project",
-  "version": "0.1.0",
+  "name": "ledgerist",
+  "version": "0.1.1",
   "private": true,
   "workspaces": [
     "apps/*",
@@ -42,5 +42,9 @@
       "<rootDir>/apps/web"
     ]
   },
-  "license": "GPL-3.0-or-later"
+  "license": "GPL-3.0-or-later",
+  "engines": {
+    "node": ">=22.0.0",
+    "npm": ">=10.0.0"
+  }
 }

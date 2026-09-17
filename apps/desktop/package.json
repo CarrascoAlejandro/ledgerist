@@ -1,10 +1,10 @@
 {
   "name": "@ledger/desktop",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Ledgerist — local-first personal ledger app (desktop)",
   "author": "Alejandro Carrasco <carrascoalejandro2003@gmail.com>",
-  "homepage": "https://github.com/CarrascoAlejandro/project-ledger-shredder",
+  "homepage": "https://github.com/CarrascoAlejandro/ledgerist",
   "main": "dist/main.js",
   "scripts": {
     "build:web": "npm run build -w @ledger/web",
