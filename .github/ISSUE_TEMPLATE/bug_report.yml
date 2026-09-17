@@ -1,0 +1,62 @@
+name: Bug report
+description: Something in Ledger is broken
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Please do **not** use this form for security
+        problems — see [SECURITY.md](../blob/main/SECURITY.md) and use private
+        vulnerability reporting instead.
+  - type: dropdown
+    id: build
+    attributes:
+      label: Which build?
+      options:
+        - Linux — .deb
+        - Linux — .AppImage
+        - Android — .apk
+        - Built from source
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The version in the artifact filename, e.g. 0.2.0
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: OS / Android version
+      placeholder: Ubuntu 24.04, or Android 14
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open book "Household"
+        2. Type `today 50 #groceries coffee` in the parser bar
+        3. Submit
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: dropdown
+    id: sync
+    attributes:
+      label: Was Device Sync involved?
+      options:
+        - "No"
+        - "Yes — two devices"
+        - "Yes — three or more devices"
+        - Not sure
+    validations:
+      required: true

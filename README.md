@@ -38,13 +38,13 @@ required.
 
 | Layer | Technology |
 |-------|------------|
-| UI | React 19, Tailwind CSS v3, React Router v6 |
+| UI | React 18, Tailwind CSS v3, React Router v6 |
 | State | Zustand stores (book, ledger, entry, settings, navigation) |
 | Database (web) | sql.js (SQLite compiled to WebAssembly), runs entirely in the browser |
 | Database (desktop) | better-sqlite3 (native SQLite via Electron IPC) |
 | Database (mobile) | @capacitor-community/sqlite (native SQLite on Android) |
 | Build | Vite 5 (web), esbuild (desktop) |
-| Packaging | electron-builder (.dmg / .exe / .deb), Capacitor 8 (Android) |
+| Packaging | electron-builder (.deb / .AppImage), Capacitor 8 (Android) |
 | Tests | Jest 29, ts-jest, @testing-library/react |
 | Language | TypeScript 5 (strict) |
 
@@ -73,7 +73,8 @@ ledger-project/
 ├── packages/
 │   ├── shared/               # Domain types (Book, Ledger, Entry, AppSettings) + utils
 │   ├── database/             # IDBConnection interface + drivers (web, desktop, renderer, capacitor)
-│   └── stores/               # Zustand stores
+│   ├── stores/               # Zustand stores
+│   └── sync/                 # P2P sync engine, protocol, transports
 ├── package.json              # npm workspaces root
 └── tsconfig.base.json
 ```
@@ -151,14 +152,21 @@ npm run build:desktop
 This builds the web app, compiles the Electron main/preload scripts, and
 runs `electron-builder`. Installers are written to `apps/desktop/dist-electron/`:
 
-| Platform | Artifact |
-|----------|----------|
-| Linux | `.deb` package |
-| macOS | `.dmg` image |
-| Windows | `.exe` NSIS installer |
+| Platform | Artifact | Status |
+|----------|----------|--------|
+| Linux | `.deb` package + `.AppImage` | Supported — built and published by CI |
+| Windows | `.exe` NSIS installer | **Out of scope** — config present, build it yourself |
+| macOS | `.dmg` image | **Out of scope** — config present, build it yourself |
 
 Run `build:desktop` on each target platform — cross-compilation is not
 supported for native modules.
+
+> **Windows and macOS are not currently released.** The electron-builder
+> config still declares `nsis` and `dmg` targets, so `npm run build:desktop`
+> on a Windows or macOS machine should produce an installer, but neither is
+> built by CI, neither is tested, and neither would be code-signed — Windows
+> SmartScreen and macOS Gatekeeper will both warn on an unsigned installer.
+> Only the Linux and Android artifacts below are official.
 
 ### Type-check the desktop app
 
@@ -235,6 +243,15 @@ Other scripts:
 
 ---
 
+## Continuous Integration
+
+`.github/workflows/ci.yml` runs on every push to `main` and every pull
+request: `npm run typecheck`, `npm test`, then a web build. The release
+pipeline runs the same checks as a `verify` gate before any packaging job
+starts, so a tag that fails either cannot produce artifacts.
+
+---
+
 ## Testing
 
 Run all tests across every package:
@@ -283,9 +300,15 @@ distributable artifacts and attaches them to a **draft** GitHub Release:
 | Artifact | Built on | Notes |
 |----------|----------|-------|
 | `Ledger_<version>_amd64.deb` | ubuntu runner | Debian/Ubuntu installer |
-| `Ledger-<version>.AppImage` | ubuntu runner | Portable — `chmod +x` and run, any distro |
-| `Ledger Setup <version>.exe` | windows runner | NSIS installer; unsigned, so SmartScreen warns — "More info → Run anyway" |
+| `Ledger_<version>_x86_64.AppImage` | ubuntu runner | Portable — `chmod +x` and run, any distro |
 | `Ledger_<version>.apk` | ubuntu runner | Signed release APK; sideload with "Install unknown apps" enabled |
+
+The desktop artifact names come from electron-builder's
+`artifactName: "${productName}_${version}_${arch}.${ext}"` in
+`apps/desktop/package.json` — change it there and this table must follow.
+
+A `verify` job type-checks and runs the full test suite before any packaging
+job starts, so a tag that does not build cannot produce a release.
 
 To cut a release:
 
@@ -369,6 +392,17 @@ last-write-wins on hybrid logical clocks. Conflicts are resolved automatically
 
 See the full design, behavior diagrams, and as-built notes in
 [`docs/sync/DESIGN.md`](docs/sync/DESIGN.md).
+
+---
+
+## Contributing & Support
+
+**Pull requests are not currently being accepted** — this is a personal
+project with one maintainer. Bug reports with reproduction steps are very
+welcome. See [`CONTRIBUTING.md`](CONTRIBUTING.md).
+
+Found a security problem? Do not open a public issue — see
+[`SECURITY.md`](SECURITY.md) for private reporting and the threat model.
 
 ---
 

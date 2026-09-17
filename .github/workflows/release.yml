@@ -1,9 +1,13 @@
 name: Release
 
 # Builds beta/release artifacts for every pushed v* tag and attaches them to a
-# draft GitHub Release: .deb + .AppImage (Linux), .exe (Windows), signed .apk
-# (Android). Windows must build on a Windows runner — better-sqlite3 is a
-# native module and cannot be cross-compiled.
+# draft Release: .deb + .AppImage (Linux) and a signed .apk (Android).
+#
+# Windows and macOS desktop builds are deliberately out of scope for now.
+# better-sqlite3 is a native module and cannot be cross-compiled, so each would
+# need its own runner, and neither artifact would be code-signed. The
+# electron-builder config still declares nsis/dmg targets so those platforms can
+# be built locally — see the README's "Desktop App" section.
 
 on:
   push:
@@ -13,7 +17,22 @@ permissions:
   contents: write
 
 jobs:
+  # Gate: never publish artifacts built from a tag that does not type-check or
+  # pass its tests. Cheap enough (~1 min) to be worth blocking the whole matrix.
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+
   desktop-linux:
+    needs: verify
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -31,24 +50,15 @@ jobs:
             apps/desktop/dist-electron/*.AppImage
           if-no-files-found: error
 
-  desktop-windows:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-      - run: npm ci
-      - run: npm run build:desktop
-      - uses: actions/upload-artifact@v4
-        with:
-          name: windows-desktop
-          path: apps/desktop/dist-electron/*.exe
-          if-no-files-found: error
-
   android:
+    needs: verify
     runs-on: ubuntu-latest
+    # Pinned rather than "whatever the runner image ships": the generated
+    # Capacitor project compiles against SDK 36, and the signing step resolves
+    # zipalign/apksigner out of this exact build-tools directory.
+    env:
+      ANDROID_PLATFORM: android-36
+      ANDROID_BUILD_TOOLS: 36.0.0
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -59,6 +69,12 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
+      - name: Install Android SDK packages
+        run: |
+          set -euo pipefail
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMANAGER" --licenses > /dev/null
+          "$SDKMANAGER" "platforms;$ANDROID_PLATFORM" "build-tools;$ANDROID_BUILD_TOOLS" "platform-tools"
       - run: npm ci
       - run: npm run build
       - name: Generate and patch native project
@@ -83,8 +99,7 @@ jobs:
         working-directory: apps/mobile
         run: |
           set -euo pipefail
-          BUILD_TOOLS="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
-          echo "Using build-tools: $BUILD_TOOLS"
+          BUILD_TOOLS="$ANDROID_HOME/build-tools/$ANDROID_BUILD_TOOLS"
           OUT=android/app/build/outputs/apk/release
           "$BUILD_TOOLS/zipalign" -p -f 4 "$OUT/app-release-unsigned.apk" "$OUT/app-release-aligned.apk"
           "$BUILD_TOOLS/apksigner" sign \
@@ -104,7 +119,7 @@ jobs:
         working-directory: apps/mobile
         run: |
           set -euo pipefail
-          BUILD_TOOLS="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
+          BUILD_TOOLS="$ANDROID_HOME/build-tools/$ANDROID_BUILD_TOOLS"
           APK=android/app/build/outputs/apk/release/app-release-signed.apk
           "$BUILD_TOOLS/zipalign" -c -p 4 "$APK"
           "$BUILD_TOOLS/apksigner" verify --print-certs "$APK"
@@ -117,7 +132,7 @@ jobs:
           if-no-files-found: error
 
   release:
-    needs: [desktop-linux, desktop-windows, android]
+    needs: [desktop-linux, android]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
