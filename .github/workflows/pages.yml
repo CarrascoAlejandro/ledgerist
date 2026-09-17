@@ -1,0 +1,56 @@
+name: Pages
+
+# Publishes the browser build of the app to GitHub Pages on every push to main.
+#
+# This is the third shell (browser) of the same React app, and the only one that
+# needs no download: sql.js keeps the whole database in the tab, so a Pages
+# deployment is a complete, working copy of the app rather than a demo.
+#
+# Two things make a subpath deployment (/ledgerist/) work without special
+# casing: `base: './'` in apps/web/vite.config.ts, so every asset URL stays
+# relative, and HashRouter in App.tsx, so routing never hits the server.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# GITHUB_TOKEN rights the deployment needs; `id-token` is what
+# actions/deploy-pages uses to prove the artifact came from this workflow.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never let two deployments race. Unlike CI, in-flight runs are allowed to
+# finish: cancelling a half-finished deploy can leave the site on a mixed set
+# of assets.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: apps/web/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

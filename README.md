@@ -1,8 +1,65 @@
 # Ledgerist
 
-A personal finance tracker built as a browser-first app. All data is stored locally in an
-in-browser SQLite database (via [sql.js](https://sql.js.org/)), so no server or account is
-required.
+A local-first personal finance tracker. Every book, ledger and entry lives in a SQLite
+database on your own device — there is no server, no account, and no sync to anybody
+else's machine. Optional peer-to-peer sync talks directly to your other devices over the
+local network, encrypted end to end.
+
+The same app ships in three shells: a browser tab (SQLite compiled to WebAssembly via
+[sql.js](https://sql.js.org/)), a Linux desktop app, and an Android app.
+
+---
+
+## Download
+
+| Platform | Get it | Notes |
+|----------|--------|-------|
+| **Browser** | **[Open the web app](https://carrascoalejandro.github.io/ledgerist/)** | Nothing to install. The database lives in the tab, in your browser's storage. |
+| **Linux (any distro)** | `Ledgerist_<version>_x86_64.AppImage` | `chmod +x Ledgerist_*.AppImage && ./Ledgerist_*.AppImage` |
+| **Linux (Debian/Ubuntu)** | `Ledgerist_<version>_amd64.deb` | `sudo apt install ./Ledgerist_*.deb` |
+| **Android 8.0+** | `Ledgerist_<version>.apk` | Sideloaded — see [Installing the APK](#installing-the-apk). |
+
+### **[→ Downloads are on the Releases page](https://github.com/CarrascoAlejandro/ledgerist/releases)**
+
+Desktop builds are x86-64 only. Windows and macOS are not published — the
+electron-builder config carries `nsis` and `dmg` targets, so you can build either
+yourself (see [Desktop App](#desktop-app-electron)), but neither is built by CI, tested,
+or code-signed.
+
+### Verifying a download
+
+Every release ships a `SHA256SUMS.txt` covering all of its artifacts. Download it
+alongside the file and check:
+
+```bash
+sha256sum -c SHA256SUMS.txt --ignore-missing
+```
+
+The APK is additionally signed with the project's release keystore. Its certificate is
+stable across every release, so you can confirm any APK came from this project:
+
+```bash
+apksigner verify --print-certs Ledgerist_*.apk
+```
+
+The SHA-256 digest it prints must be exactly:
+
+```
+b85d1c85b08a270fec316d576f660cb222293779028989559c5ed5dfe71f6f1a
+```
+
+The same value is repeated in each release's `*.apk.cert.txt`. A different digest means
+the APK was signed by someone else — do not install it.
+
+### Installing the APK
+
+Android blocks sideloading by default. Open the APK from your file manager and, when
+prompted, allow that app to install unknown apps. Play Protect may also warn that the
+developer is unrecognised — the app is signed, but by a self-managed key rather than one
+Google vouches for.
+
+Release APKs cannot install over a debug build made from source: the signatures differ,
+so uninstall the old copy first.
 
 ---
 
@@ -343,6 +400,8 @@ distributable artifacts and attaches them to a **draft** GitHub Release:
 | `Ledgerist_<version>_amd64.deb` | ubuntu runner | Debian/Ubuntu installer |
 | `Ledgerist_<version>_x86_64.AppImage` | ubuntu runner | Portable — `chmod +x` and run, any distro |
 | `Ledgerist_<version>.apk` | ubuntu runner | Signed release APK; sideload with "Install unknown apps" enabled |
+| `Ledgerist_<version>.apk.cert.txt` | ubuntu runner | `apksigner` certificate fingerprints for the APK above |
+| `SHA256SUMS.txt` | ubuntu runner | Checksums over every artifact in the release |
 
 The desktop artifact names come from electron-builder's
 `artifactName: "${productName}_${version}_${arch}.${ext}"` in
@@ -351,7 +410,26 @@ The desktop artifact names come from electron-builder's
 A `verify` job type-checks and runs the full test suite before any packaging
 job starts, so a tag that does not build cannot produce a release.
 
-To cut a release:
+A tag whose name contains a `-` (`v0.2.0-beta`) is published as a GitHub
+pre-release. Note that while *every* release is a pre-release, the
+`/releases/latest` URL returns 404 — which is why the download links above point
+at `/releases`. The first non-suffixed tag fixes that.
+
+### Dry-running the packaging
+
+The release workflow also accepts `workflow_dispatch`, which runs every build
+and verification step and then stops: the publishing job is gated on
+`startsWith(github.ref, 'refs/tags/')`, so a manual run can never create a
+release. Use it after touching anything in the packaging path — electron-builder
+config, `prepare-android.mjs`, SDK pins — rather than discovering the break on a
+tag:
+
+```bash
+gh workflow run release.yml --ref main
+gh run watch
+```
+
+### Cutting a release
 
 ```bash
 npm version 0.2.0 --no-git-tag-version            # root
@@ -360,7 +438,30 @@ git commit -am "chore: v0.2.0" && git tag v0.2.0
 git push && git push --tags
 ```
 
+All four versions must move together: the APK filename and its `versionCode`
+come from the root and mobile `package.json` respectively, not from the tag, so
+a partial bump ships mislabelled artifacts.
+
 Then review the draft release on GitHub and publish it.
+
+### Web app (GitHub Pages)
+
+`.github/workflows/pages.yml` deploys `apps/web/dist` to
+<https://carrascoalejandro.github.io/ledgerist/> on every push to `main` — no tag
+needed, and independent of the release artifacts.
+
+Two existing choices are what let the app run unmodified from a subpath: `base:
+'./'` in `apps/web/vite.config.ts` keeps every asset URL relative, and
+`HashRouter` in `App.tsx` means routing never reaches the server. Both are load-
+bearing for Pages; changing either breaks the deployment but not the local dev
+server, so the failure would be silent.
+
+The Pages build is the browser shell, so it uses the sql.js driver and stores its
+database in the visitor's IndexedDB. Device Sync is effectively desktop/mobile
+only there: accepting a connection needs the Electron relay
+(`electronSyncAPI()` is null in a browser, so `wireAcceptorOnce` never wires an
+acceptor), and outbound `ws://` from an `https://` page is blocked as mixed
+content regardless.
 
 ### Android signing
 

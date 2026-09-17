@@ -12,6 +12,10 @@ name: Release
 on:
   push:
     tags: ['v*']
+  # Dry run: builds and verifies every artifact without publishing anything, so
+  # the packaging path can be exercised from main before a tag is cut. The
+  # `release` job is tag-gated and is skipped on these runs.
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -122,25 +126,56 @@ jobs:
           BUILD_TOOLS="$ANDROID_HOME/build-tools/$ANDROID_BUILD_TOOLS"
           APK=android/app/build/outputs/apk/release/app-release-signed.apk
           "$BUILD_TOOLS/zipalign" -c -p 4 "$APK"
-          "$BUILD_TOOLS/apksigner" verify --print-certs "$APK"
-      - name: Rename APK to versioned artifact
-        run: mv apps/mobile/android/app/build/outputs/apk/release/app-release-signed.apk "Ledgerist_$(node -p "require('./package.json').version").apk"
+          "$BUILD_TOOLS/apksigner" verify --print-certs "$APK" | tee "$RUNNER_TEMP/apksigner-certs.txt"
+      # The fingerprints ship next to the APK so a downloader can confirm the
+      # file was signed with the project keystore and not re-signed by someone
+      # in between. The expected SHA-256 is published in the README.
+      - name: Rename APK and record signing certificate
+        run: |
+          set -euo pipefail
+          VERSION=$(node -p "require('./package.json').version")
+          mv apps/mobile/android/app/build/outputs/apk/release/app-release-signed.apk "Ledgerist_$VERSION.apk"
+          {
+            echo "Ledgerist_$VERSION.apk"
+            echo
+            grep -E 'certificate (DN|SHA-256 digest|SHA-1 digest)' "$RUNNER_TEMP/apksigner-certs.txt"
+          } > "Ledgerist_$VERSION.apk.cert.txt"
       - uses: actions/upload-artifact@v4
         with:
           name: android-apk
-          path: Ledgerist_*.apk
+          path: |
+            Ledgerist_*.apk
+            Ledgerist_*.apk.cert.txt
           if-no-files-found: error
 
   release:
     needs: [desktop-linux, android]
+    # Only a tag push publishes. A workflow_dispatch dry run stops after the
+    # build jobs, having proved the artifacts still assemble.
+    if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
           merge-multiple: true
+      # Everything here is unsigned (Linux) or signed by a key no store vouches
+      # for (Android), so a published checksum is the only integrity handle a
+      # downloader has. Written outside the directory first so the glob cannot
+      # pick up the file being created.
+      - name: Generate checksums
+        working-directory: artifacts
+        run: |
+          set -euo pipefail
+          sha256sum -- * > "$RUNNER_TEMP/SHA256SUMS.txt"
+          mv "$RUNNER_TEMP/SHA256SUMS.txt" .
+          cat SHA256SUMS.txt
       - uses: softprops/action-gh-release@v2
         with:
           draft: true
+          # A tag with a pre-release suffix (v0.2.0-beta) publishes as a GitHub
+          # pre-release. Caveat: while *every* release is a pre-release,
+          # /releases/latest 404s -- the README links to /releases instead.
+          prerelease: ${{ contains(github.ref_name, '-') }}
           generate_release_notes: true
           files: artifacts/*
