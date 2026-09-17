@@ -50,6 +50,7 @@
       "target": "nsis"
     },
     "linux": {
+      "icon": "build/icons",
       "target": [
         "deb",
         "AppImage"

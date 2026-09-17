@@ -15,7 +15,8 @@
     "mobile:android": "npm run android -w @ledger/mobile",
     "test": "jest",
     "test:watch": "jest --watch",
-    "typecheck": "tsc -p packages/shared --noEmit && tsc -p packages/database --noEmit && tsc -p packages/stores --noEmit && tsc -p packages/sync --noEmit && tsc -p apps/web --noEmit && tsc -p apps/desktop --noEmit && tsc -p apps/mobile --noEmit"
+    "typecheck": "tsc -p packages/shared --noEmit && tsc -p packages/database --noEmit && tsc -p packages/stores --noEmit && tsc -p packages/sync --noEmit && tsc -p apps/web --noEmit && tsc -p apps/desktop --noEmit && tsc -p apps/mobile --noEmit",
+    "icons": "node scripts/generate-icons.mjs"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.4.2",
@@ -27,6 +28,7 @@
     "@types/react-dom": "^18.3.0",
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0",
+    "sharp": "^0.35.4",
     "ts-jest": "^29.2.3",
     "ts-node": "^10.9.2",
     "typescript": "^5.5.4"

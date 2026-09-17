@@ -75,6 +75,10 @@ ledger-project/
 │   ├── database/             # IDBConnection interface + drivers (web, desktop, renderer, capacitor)
 │   ├── stores/               # Zustand stores
 │   └── sync/                 # P2P sync engine, protocol, transports
+├── assets/
+│   └── icon.svg              # Icon source of truth — see Icons
+├── scripts/
+│   └── generate-icons.mjs    # Rasterises icon.svg for every shell (`npm run icons`)
 ├── package.json              # npm workspaces root
 └── tsconfig.base.json
 ```
@@ -245,6 +249,38 @@ Other scripts:
 
 > Data is stored in a native SQLite file named `ledgerSQLite.db` (the plugin
 > appends the `SQLite.db` suffix) inside the app's private databases directory.
+
+---
+
+## Icons
+
+`assets/icon.svg` is the single source of truth. Everything else is generated:
+
+```bash
+npm run icons          # rasterises assets/icon.svg into all three shells
+```
+
+| Output | Size(s) | Consumed by |
+|--------|---------|-------------|
+| `apps/desktop/build/icon.png` | 1024 | electron-builder, for `.ico`/`.icns` conversion if Windows/macOS are ever built |
+| `apps/desktop/build/icons/NxN.png` | 16 → 1024 | electron-builder Linux — installed into `/usr/share/icons/hicolor/NxN/apps/` |
+| `apps/mobile/assets/icon*.png` | 1024 | `capacitor-assets`, which writes the real mipmaps into `android/` |
+| `apps/web/public/favicon.*` | svg, 96, 180, 512 | the browser build, linked from `index.html` |
+
+Two non-obvious constraints are baked into the generator — read its header
+comment before changing sizes:
+
+- **Linux needs the `icons/NxN.png` set, not just `icon.png`.** Handed a lone
+  `icon.png`, electron-builder 24 installs it to `hicolor/0x0/apps/` — a path
+  no desktop environment reads, so the app silently has no icon.
+- **The Android foreground layer is scaled *up*, not down.** `capacitor-assets`
+  emits `android:inset="16.7%"`, which already maps the source onto the
+  adaptive icon's safe area. Pre-shrinking the art to fit the safe zone
+  compounds with that inset and leaves a small logo adrift in background.
+
+Android icons live in the gitignored `android/` tree, so they are regenerated
+by `prepare-android.mjs` on every `add:android` / `prepare:android` — run
+`npm run icons` first if the source art changed.
 
 ---
 

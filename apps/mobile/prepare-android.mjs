@@ -7,8 +7,13 @@
  *   2. minSdkVersion 26 (required by @capacitor/barcode-scanner's native lib).
  *   3. versionName / versionCode derived from this package's version, so
  *      release APKs upgrade in place (versionCode = major*10000 + minor*100 + patch).
+ *   4. Launcher icons (legacy mipmaps + adaptive foreground/background) generated
+ *      from assets/ by capacitor-assets. The icons live in the gitignored
+ *      android/ tree, so they have to be regenerated alongside it — run
+ *      `npm run icons` at the repo root first if assets/icon.svg changed.
  */
-import { readFileSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -48,5 +53,20 @@ patch(join(android, 'app/build.gradle'), (src) =>
     .replace(/versionCode \d+/, `versionCode ${versionCode}`)
     .replace(/versionName "[^"]*"/, `versionName "${version}"`),
 );
+
+// 4. Launcher icons. capacitor-assets writes mipmap-*/ and the adaptive icon
+// XML into android/, which cap add regenerates from scratch — so this has to
+// run on every prepare, not just once.
+const iconSource = join(root, 'assets/icon.png');
+if (existsSync(iconSource)) {
+  execFileSync('npx', ['capacitor-assets', 'generate', '--android'], {
+    cwd: root,
+    stdio: 'inherit',
+  });
+  console.log('ok      launcher icons');
+} else {
+  console.warn(`WARNING no ${iconSource} — run \`npm run icons\` at the repo root.`);
+  console.warn('        the APK will ship the default Capacitor icon.');
+}
 
 console.log(`android project ready (versionName ${version}, versionCode ${versionCode})`);

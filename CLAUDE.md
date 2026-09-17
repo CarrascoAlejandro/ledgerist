@@ -137,6 +137,21 @@ path router can never match. Routes other than the dashboard are `lazy()`.
 hand-edit the generated native project — patch that script instead. Requires a
 full JDK 21 (Temurin; GraalVM's jlink breaks `JdkImageTransform`).
 
+## Icons
+
+`assets/icon.svg` is the source of truth; `npm run icons`
+(`scripts/generate-icons.mjs`) rasterises it into `apps/desktop/build/`,
+`apps/mobile/assets/` and `apps/web/public/`. Never hand-edit a generated PNG.
+
+Two traps the generator already works around, documented in its header:
+electron-builder needs the `build/icons/NxN.png` set for Linux (a lone
+`icon.png` installs to the unreadable `hicolor/0x0/apps/`), and the Capacitor
+adaptive-icon foreground must be scaled *up* to a tight crop because
+`capacitor-assets` applies its own `android:inset="16.7%"`.
+
+`apps/desktop/build/` is force-unignored in `.gitignore` — the bare `build/`
+rule would otherwise swallow it.
+
 ## Releases
 
 Pushing a `v*` tag runs `.github/workflows/release.yml` (deb + AppImage + exe +

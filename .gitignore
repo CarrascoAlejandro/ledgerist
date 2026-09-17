@@ -7,6 +7,11 @@ dist/
 build/
 *.tsbuildinfo
 
+# ...but electron-builder's icon source lives in a conventionally-named build/
+# dir. Git cannot re-include a file under an excluded directory, so the
+# directory itself has to be unignored.
+!apps/desktop/build/
+
 # Test coverage
 coverage/
 

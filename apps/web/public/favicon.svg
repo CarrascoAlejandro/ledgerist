@@ -1,0 +1,94 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" xmlns:c2pa="http://c2pa.org/manifest">
+  <defs>
+    <!-- Outer rim: beveled metal edge -->
+    <linearGradient id="rimGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%"  stop-color="#F1F3F4"/>
+      <stop offset="35%" stop-color="#C7CCD1"/>
+      <stop offset="65%" stop-color="#9AA0A6"/>
+      <stop offset="100%" stop-color="#6C7176"/>
+    </linearGradient>
+
+    <!-- Coin face: subtle dished sheen -->
+    <radialGradient id="faceGrad" cx="38%" cy="32%" r="75%">
+      <stop offset="0%"  stop-color="#FDFDFE"/>
+      <stop offset="45%" stop-color="#E4E7E9"/>
+      <stop offset="80%" stop-color="#C1C6CA"/>
+      <stop offset="100%" stop-color="#AEB4B9"/>
+    </radialGradient>
+
+    <!-- Quill: polished vertical highlight -->
+    <linearGradient id="quillGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%"  stop-color="#FBFCFC"/>
+      <stop offset="45%" stop-color="#CDD2D5"/>
+      <stop offset="100%" stop-color="#868D93"/>
+    </linearGradient>
+  </defs>
+
+  <!-- ============ COIN ============ -->
+  <circle cx="512" cy="512" r="330" fill="url(#rimGrad)"/>
+
+  <!-- reeded edge -->
+  <circle cx="512" cy="512" r="322" fill="none" stroke="#7B8085"
+          stroke-width="5" stroke-dasharray="3 7" opacity="0.5"/>
+
+  <!-- recessed face -->
+  <circle cx="512" cy="512" r="296" fill="url(#faceGrad)"/>
+
+  <!-- inner engraved border -->
+  <circle cx="512" cy="512" r="268" fill="none" stroke="#5C6167" stroke-width="6" opacity="0.9"/>
+  <circle cx="512" cy="512" r="258" fill="none" stroke="#FFFFFF" stroke-width="2" opacity="0.55"/>
+
+  <!-- ============ QUILL (symmetric about x=512) ============ -->
+  <g>
+    <!-- drop shadow pass, for engraved depth -->
+    <path d="M512,304
+             C570,321 602,368 594,417
+             C588,455 563,494 528,544
+             L520,552
+             L520,676
+             C520,690 516,709 512,734
+             C508,709 504,690 504,676
+             L504,552
+             L496,544
+             C461,494 436,455 430,417
+             C422,368 454,321 512,304 Z"
+          fill="#565B60" opacity="0.45" transform="translate(6,7)"/>
+
+    <!-- main feather / quill body -->
+    <path d="M512,304
+             C570,321 602,368 594,417
+             C588,455 563,494 528,544
+             L520,552
+             L520,676
+             C520,690 516,709 512,734
+             C508,709 504,690 504,676
+             L504,552
+             L496,544
+             C461,494 436,455 430,417
+             C422,368 454,321 512,304 Z"
+          fill="url(#quillGrad)" stroke="#4B4F53" stroke-width="3" stroke-linejoin="round"/>
+
+    <!-- central rachis (spine) -->
+    <line x1="512" y1="318" x2="512" y2="726" stroke="#575C61" stroke-width="4.5" opacity="0.75" stroke-linecap="round"/>
+
+    <!-- symmetric barb strokes -->
+    <g stroke="#575C61" stroke-width="6.5" stroke-linecap="round" opacity="0.75">
+      <line x1="512" y1="352" x2="562" y2="335"/>
+      <line x1="512" y1="352" x2="462" y2="335"/>
+
+      <line x1="512" y1="398" x2="568" y2="380"/>
+      <line x1="512" y1="398" x2="456" y2="380"/>
+
+      <line x1="512" y1="444" x2="559" y2="426"/>
+      <line x1="512" y1="444" x2="465" y2="426"/>
+
+      <line x1="512" y1="490" x2="542" y2="473"/>
+      <line x1="512" y1="490" x2="482" y2="473"/>
+    </g>
+
+    <!-- nib slit -->
+    <line x1="512" y1="668" x2="512" y2="722" stroke="#4B4F53" stroke-width="3.5"/>
+    <!-- nib vent -->
+    <ellipse cx="512" cy="674" rx="5.5" ry="7.5" fill="url(#faceGrad)" stroke="#5C6167" stroke-width="2"/>
+  </g>
+</svg>
