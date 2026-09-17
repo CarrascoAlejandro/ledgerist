@@ -26,10 +26,18 @@ npx jest -t "converges after three devices"       # by test name
 SYNC_PERF=1 npx jest --selectProjects sync perf   # the perf suite is env-gated and skipped by default
 ```
 
-Commit messages are validated by a `commit-msg` hook — read
-`.agents/skills/commit-conventions/SKILL.md` (surfaced as the `commit-conventions`
-skill) before writing one. First line ≤ 64 chars, conventional type, no trailing
-period, and the words "github"/"gitlab" are rejected anywhere in the message.
+Commit messages are validated by a local `commit-msg` hook. A commit is
+rejected unless all of the following hold:
+
+- first line is **≤ 64 characters**, including `type(scope): `
+- format is `type(scope): description`; the scope is optional
+- type is one of `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`,
+  `merge`
+- the first line does not end with a period
+- the message contains neither "github" nor "gitlab" anywhere (case-insensitive)
+
+The hook lives in `.git/hooks/`, so it is per-clone and not distributed with
+the repo.
 
 ## Architecture
 

@@ -50,6 +50,18 @@ dist-electron/
 *.keystore
 keystore.properties
 
-# Local agent settings (machine-specific)
+# Local maintainer notes — working records, not user documentation
+notes/
+
+# Agent skills and local agent settings — for every agent, not just one.
+# These are routinely synced in from private or employer repositories, so they
+# must never be tracked here: committing them would publish internal tooling
+# and the names of private repos. Keep the files locally, just never staged.
+.agents/
+skills-lock.json
 .claude/settings.local.json
 .claude/skills/
+.cursor/rules/
+.windsurf/rules/
+.aider*
+AGENTS.local.md
