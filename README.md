@@ -434,13 +434,20 @@ gh run watch
 ```bash
 npm version 0.2.0 --no-git-tag-version            # root
 npm pkg set version=0.2.0 -w apps/web -w @ledger/desktop -w @ledger/mobile
+npm install --package-lock-only                   # or `npm ci` fails in CI
 git commit -am "chore: v0.2.0" && git tag v0.2.0
-git push && git push --tags
+git push origin main v0.2.0
 ```
 
 All four versions must move together: the APK filename and its `versionCode`
 come from the root and mobile `package.json` respectively, not from the tag, so
-a partial bump ships mislabelled artifacts.
+a partial bump ships mislabelled artifacts. `package-lock.json` records the
+workspace versions too, and `npm ci` refuses to run against a lockfile that
+disagrees with `package.json`.
+
+Push the one tag by name rather than `git push --tags`: a stale local tag left
+over from an abandoned release would otherwise go up with it and trigger a
+second release build from that old tree.
 
 Then review the draft release on GitHub and publish it.
 
