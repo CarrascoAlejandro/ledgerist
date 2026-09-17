@@ -25,5 +25,6 @@
     "better-sqlite3": {
       "optional": true
     }
-  }
+  },
+  "license": "GPL-3.0-or-later"
 }

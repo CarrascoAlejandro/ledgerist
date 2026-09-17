@@ -8,9 +8,10 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@ledger/shared": "*",
     "@ledger/database": "*",
+    "@ledger/shared": "*",
     "@ledger/sync": "*",
     "zustand": "^4.5.4"
-  }
+  },
+  "license": "GPL-3.0-or-later"
 }
