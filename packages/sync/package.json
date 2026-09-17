@@ -14,7 +14,7 @@
   "devDependencies": {
     "@ledger/stores": "*",
     "@types/ws": "^8.18.1",
-    "ws": "^8.21.0"
+    "ws": "^8.21.3"
   },
   "license": "GPL-3.0-or-later"
 }
