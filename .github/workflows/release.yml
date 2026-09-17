@@ -77,7 +77,11 @@ jobs:
         run: |
           set -euo pipefail
           SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
-          yes | "$SDKMANAGER" --licenses > /dev/null
+          # `yes` is killed by SIGPIPE the moment sdkmanager stops reading, and
+          # under `pipefail` that sinks the whole step. Swallowing it is safe:
+          # the install below is the real gate and fails loudly if any licence
+          # was left unaccepted.
+          yes 2>/dev/null | "$SDKMANAGER" --licenses > /dev/null || true
           "$SDKMANAGER" "platforms;$ANDROID_PLATFORM" "build-tools;$ANDROID_BUILD_TOOLS" "platform-tools"
       - run: npm ci
       - run: npm run build
