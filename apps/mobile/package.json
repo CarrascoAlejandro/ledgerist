@@ -10,11 +10,11 @@
     "prepare:android": "node prepare-android.mjs"
   },
   "dependencies": {
-    "@capacitor-community/sqlite": "^8.1.0",
-    "@capacitor/android": "^8.1.0",
-    "@capacitor/barcode-scanner": "^3.0.2",
+    "@capacitor-community/sqlite": "^8.1.1",
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/barcode-scanner": "^3.1.2",
     "@capacitor/core": "^8.1.0",
-    "@capacitor/ios": "^8.1.0"
+    "@capacitor/ios": "^8.5.2"
   },
   "devDependencies": {
     "@capacitor/assets": "^3.0.5",
