@@ -32,6 +32,11 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Root `npm ci` installs every workspace, so the browser build would
+    # otherwise pull Electron's ~100MB binary to use none of it. Skipping it is
+    # faster and removes the flakiest download in the job.
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: 1
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

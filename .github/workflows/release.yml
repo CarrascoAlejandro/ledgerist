@@ -63,6 +63,9 @@ jobs:
     env:
       ANDROID_PLATFORM: android-36
       ANDROID_BUILD_TOOLS: 36.0.0
+      # Nothing in the Android path uses Electron, and a failed binary download
+      # here would fail a release. desktop-linux still installs it normally.
+      ELECTRON_SKIP_BINARY_DOWNLOAD: 1
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
