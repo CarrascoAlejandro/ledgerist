@@ -1,8 +1,8 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.ledger.app',
-  appName: 'Ledger',
+  appId: 'com.ledgerist.app',
+  appName: 'Ledgerist',
   webDir: '../web/dist',
   server: {
     androidScheme: 'https',

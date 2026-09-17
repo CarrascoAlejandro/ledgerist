@@ -1,5 +1,5 @@
 name: Feature idea
-description: Suggest something Ledger could do
+description: Suggest something Ledgerist could do
 labels: [enhancement]
 body:
   - type: markdown
@@ -17,6 +17,6 @@ body:
   - type: textarea
     id: idea
     attributes:
-      label: What would you like Ledger to do?
+      label: What would you like Ledgerist to do?
     validations:
       required: true

@@ -1,6 +1,6 @@
 # Inter-Device P2P Sync — Design
 
-Phase 6 of the Ledger project: synchronize books, ledgers, and entries between a
+Phase 6 of the Ledgerist project: synchronize books, ledgers, and entries between a
 user's devices **without any central server holding ground truth**. Devices sync
 peer-to-peer, git-style; when the same row was changed on both sides, the most
 recent write wins.

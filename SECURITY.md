@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-Ledger is pre-1.0 and ships as beta builds. Only the **most recent release** is
+Ledgerist is pre-1.0 and ships as beta builds. Only the **most recent release** is
 supported; fixes are not backported.
 
 ## Reporting a vulnerability
@@ -21,7 +21,7 @@ product, so please be patient.
 
 ## What is in scope
 
-The parts of Ledger where a vulnerability would actually matter:
+The parts of Ledgerist where a vulnerability would actually matter:
 
 - **Device Sync** — the pairing handshake (HMAC/HKDF), the `SecureChannel`
   AES-GCM transport, and the merge path. Anything that lets an unpaired device
@@ -45,13 +45,13 @@ The parts of Ledger where a vulnerability would actually matter:
   deliberately not TLS. Reports that amount to "the socket is not TLS" will be
   closed — reports that break the application-layer crypto will not.
 - **Local attacks by someone who already has your unlocked device.** The
-  SQLite database is not encrypted at rest. Ledger relies on the OS user
+  SQLite database is not encrypted at rest. Ledgerist relies on the OS user
   account and the app sandbox for that.
-- Anything in a dependency that is not reachable from Ledger's own code paths.
+- Anything in a dependency that is not reachable from Ledgerist's own code paths.
 
 ## Threat model, briefly
 
-Ledger is local-first: there is no server, no account, and no data ever leaves
+Ledgerist is local-first: there is no server, no account, and no data ever leaves
 your devices except during an explicit, manually triggered LAN sync between
 devices you have paired. The design, including the pairing and session
 protocols, is documented in [`docs/sync/DESIGN.md`](docs/sync/DESIGN.md).

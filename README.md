@@ -1,4 +1,4 @@
-# Ledger Project
+# Ledgerist
 
 A personal finance tracker built as a browser-first app. All data is stored locally in an
 in-browser SQLite database (via [sql.js](https://sql.js.org/)), so no server or account is
@@ -120,9 +120,14 @@ in the OS user-data directory:
 
 | Platform | Path |
 |----------|------|
-| Linux | `~/.config/Ledger/ledger.db` |
-| macOS | `~/Library/Application Support/Ledger/ledger.db` |
-| Windows | `%APPDATA%\Ledger\ledger.db` |
+| Linux | `~/.config/Ledgerist/ledger.db` |
+| macOS | `~/Library/Application Support/Ledgerist/ledger.db` |
+| Windows | `%APPDATA%\Ledgerist\ledger.db` |
+
+> These are the paths for a **packaged** build, where the directory comes from
+> electron-builder's `productName`. An unpackaged `npm run desktop` uses the
+> package name instead, so dev data lives in `~/.config/@ledger/desktop/`
+> — a separate database from the installed app's.
 
 ### Prerequisites
 
@@ -299,9 +304,9 @@ distributable artifacts and attaches them to a **draft** GitHub Release:
 
 | Artifact | Built on | Notes |
 |----------|----------|-------|
-| `Ledger_<version>_amd64.deb` | ubuntu runner | Debian/Ubuntu installer |
-| `Ledger_<version>_x86_64.AppImage` | ubuntu runner | Portable — `chmod +x` and run, any distro |
-| `Ledger_<version>.apk` | ubuntu runner | Signed release APK; sideload with "Install unknown apps" enabled |
+| `Ledgerist_<version>_amd64.deb` | ubuntu runner | Debian/Ubuntu installer |
+| `Ledgerist_<version>_x86_64.AppImage` | ubuntu runner | Portable — `chmod +x` and run, any distro |
+| `Ledgerist_<version>.apk` | ubuntu runner | Signed release APK; sideload with "Install unknown apps" enabled |
 
 The desktop artifact names come from electron-builder's
 `artifactName: "${productName}_${version}_${arch}.${ext}"` in
@@ -410,7 +415,7 @@ Found a security problem? Do not open a public issue — see
 
 Copyright (C) 2026 Alejandro Carrasco
 
-Ledger is free software: you can redistribute it and/or modify it under the
+Ledgerist is free software: you can redistribute it and/or modify it under the
 terms of the **GNU General Public License** as published by the Free Software
 Foundation, either version 3 of the License, or (at your option) any later
 version. See [`LICENSE`](LICENSE) for the full text.

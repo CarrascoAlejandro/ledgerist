@@ -27,7 +27,7 @@ is genuinely useful. Include:
 
 ## Forking
 
-You are free to fork and modify Ledger — that is the whole point of the
+You are free to fork and modify Ledgerist — that is the whole point of the
 GPL-3.0 license. If you distribute your modified version, you must publish
 its source under the same license. See [`LICENSE`](LICENSE).
 

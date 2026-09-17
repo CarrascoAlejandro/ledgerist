@@ -1,5 +1,5 @@
 name: Bug report
-description: Something in Ledger is broken
+description: Something in Ledgerist is broken
 labels: [bug]
 body:
   - type: markdown

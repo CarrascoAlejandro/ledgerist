@@ -2,7 +2,7 @@
   "name": "@ledger/desktop",
   "version": "0.1.0",
   "private": true,
-  "description": "Ledger — local-first personal ledger app (desktop)",
+  "description": "Ledgerist — local-first personal ledger app (desktop)",
   "author": "Alejandro Carrasco <carrascoalejandro2003@gmail.com>",
   "homepage": "https://github.com/CarrascoAlejandro/project-ledger-shredder",
   "main": "dist/main.js",
@@ -26,9 +26,9 @@
     "esbuild": "^0.23.0"
   },
   "build": {
-    "appId": "com.ledger.desktop",
-    "productName": "Ledger",
-    "executableName": "ledger-desktop",
+    "appId": "com.ledgerist.desktop",
+    "productName": "Ledgerist",
+    "executableName": "ledgerist-desktop",
     "electronVersion": "31.7.7",
     "artifactName": "${productName}_${version}_${arch}.${ext}",
     "files": [
@@ -57,7 +57,7 @@
       "category": "Office"
     },
     "deb": {
-      "packageName": "ledger-desktop"
+      "packageName": "ledgerist-desktop"
     }
   },
   "license": "GPL-3.0-or-later"

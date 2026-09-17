@@ -124,11 +124,11 @@ jobs:
           "$BUILD_TOOLS/zipalign" -c -p 4 "$APK"
           "$BUILD_TOOLS/apksigner" verify --print-certs "$APK"
       - name: Rename APK to versioned artifact
-        run: mv apps/mobile/android/app/build/outputs/apk/release/app-release-signed.apk "Ledger_$(node -p "require('./package.json').version").apk"
+        run: mv apps/mobile/android/app/build/outputs/apk/release/app-release-signed.apk "Ledgerist_$(node -p "require('./package.json').version").apk"
       - uses: actions/upload-artifact@v4
         with:
           name: android-apk
-          path: Ledger_*.apk
+          path: Ledgerist_*.apk
           if-no-files-found: error
 
   release:
